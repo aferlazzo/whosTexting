@@ -70,12 +70,18 @@ public final class MessagesListener extends NotificationListenerService {
             diagnostic = "Sender title filtered";
             return;
         }
-        if (isIgnored(this, sender)) {
+        captureSender(this, sender);
+    }
+
+    // Shared by real notification handling and the clearly labeled built-in test.
+    static boolean captureSender(Context context, String sender) {
+        if (isIgnored(context, sender)) {
             diagnostic = "Ignored sender skipped";
-            return;
+            return false;
         }
         lastSender = sender;
         count++;
         diagnostic = "Sender captured";
+        return true;
     }
 }
