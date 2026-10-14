@@ -6,6 +6,10 @@ import android.app.AlertDialog;
 import android.app.NotificationManager;
 import android.content.ComponentName;
 import android.content.Intent;
+import android.database.Cursor;
+import android.net.Uri;
+import android.provider.ContactsContract;
+import android.telephony.PhoneNumberUtils;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.os.Handler;
@@ -18,6 +22,7 @@ import android.widget.TextView;
 
 public final class MainActivity extends Activity {
     private TextView status;
+    private TextView identityResult;
     private final Handler statusHandler = new Handler(Looper.getMainLooper());
     private final Runnable statusUpdater = new Runnable() {
         @Override public void run() {
@@ -51,6 +56,12 @@ public final class MainActivity extends Activity {
         });
         add(root, "3. Start fresh test", () -> { MessagesListener.count = 0; MessagesListener.allEvents = 0; MessagesListener.googleEvents = 0; MessagesListener.diagnostic = "Waiting for notification"; MessagesListener.lastSender = "No sender captured"; MessagesListener.testing = true; refresh(); });
         add(root, "Stop test and erase", () -> { MessagesListener.testing = false; MessagesListener.count = 0; MessagesListener.allEvents = 0; MessagesListener.googleEvents = 0; MessagesListener.diagnostic = "Test stopped"; MessagesListener.lastSender = "No sender captured"; refresh(); });
+        add(root, "Check last sender in Contacts", this::checkLastSender);
+        identityResult = new TextView(this);
+        identityResult.setTextSize(18);
+        identityResult.setPadding(0, 14, 0, 14);
+        identityResult.setText("Identity: not checked");
+        root.addView(identityResult);
         add(root, "Refresh status", this::refresh);
         setContentView(root);
         refresh();
@@ -70,6 +81,32 @@ public final class MainActivity extends Activity {
     }
     @Override public void onRequestPermissionsResult(int code, String[] permissions, int[] results) {
         super.onRequestPermissionsResult(code, permissions, results); refresh();
+    }
+    private void checkLastSender() {
+        if (checkSelfPermission(Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) {
+            identityResult.setText("Contacts permission required. Approve the Android prompt to check this number.");
+            requestPermissions(new String[]{Manifest.permission.READ_CONTACTS}, 10);
+            return;
+        }
+        String sender = MessagesListener.lastSender;
+        String digits = sender.replaceAll("[^0-9+]", "");
+        if (digits.length() < 7 || digits.length() > 16 || !PhoneNumberUtils.isGlobalPhoneNumber(digits)) {
+            identityResult.setText("Identity: last sender is not a recognizable phone number.");
+            return;
+        }
+        Uri uri = Uri.withAppendedPath(ContactsContract.PhoneLookup.CONTENT_FILTER_URI, Uri.encode(digits));
+        try (Cursor cursor = getContentResolver().query(uri,
+                new String[]{ContactsContract.PhoneLookup.DISPLAY_NAME}, null, null, null)) {
+            if (cursor != null && cursor.moveToFirst()) {
+                identityResult.setText("Saved contact: " + cursor.getString(0));
+            } else {
+                identityResult.setText("Unknown sender: " + sender + "\\nNot found in device Contacts. No business identity verified.");
+            }
+        } catch (SecurityException ex) {
+            identityResult.setText("Contacts access was denied.");
+        } catch (RuntimeException ex) {
+            identityResult.setText("Contacts lookup unavailable. No identity inferred.");
+        }
     }
     private void refresh() {
         if (status == null) return;
