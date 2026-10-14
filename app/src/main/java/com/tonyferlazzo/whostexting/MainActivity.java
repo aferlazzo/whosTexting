@@ -49,8 +49,8 @@ public final class MainActivity extends Activity {
                 requestPermissions(new String[]{Manifest.permission.READ_CONTACTS}, 10);
             else refresh();
         });
-        add(root, "3. Start fresh test", () -> { MessagesListener.count = 0; MessagesListener.lastSender = "No sender captured"; MessagesListener.testing = true; refresh(); });
-        add(root, "Stop test and erase", () -> { MessagesListener.testing = false; MessagesListener.count = 0; MessagesListener.lastSender = "No sender captured"; refresh(); });
+        add(root, "3. Start fresh test", () -> { MessagesListener.count = 0; MessagesListener.allEvents = 0; MessagesListener.googleEvents = 0; MessagesListener.diagnostic = "Waiting for notification"; MessagesListener.lastSender = "No sender captured"; MessagesListener.testing = true; refresh(); });
+        add(root, "Stop test and erase", () -> { MessagesListener.testing = false; MessagesListener.count = 0; MessagesListener.allEvents = 0; MessagesListener.googleEvents = 0; MessagesListener.diagnostic = "Test stopped"; MessagesListener.lastSender = "No sender captured"; refresh(); });
         add(root, "Refresh status", this::refresh);
         setContentView(root);
         refresh();
@@ -80,6 +80,9 @@ public final class MainActivity extends Activity {
             "\nListener connected: " + MessagesListener.connected +
             "\nContacts permission: " + (contacts ? "Allowed" : "Not allowed") +
             "\nTest: " + (MessagesListener.testing ? "Running" : "Stopped") +
+            "\nAll notification events: " + MessagesListener.allEvents +
+            "\nGoogle Messages notifications: " + MessagesListener.googleEvents +
+            "\nDiagnostic: " + MessagesListener.diagnostic +
             "\nGoogle Messages events: " + MessagesListener.count +
             "\nLast sender label: " + MessagesListener.lastSender +
             "\n\nAndroid may restrict notification access for sideloaded APKs. Do not disable Play Protect globally.");
