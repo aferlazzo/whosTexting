@@ -1,10 +1,10 @@
-name: Android recovery build
+name: Android build
 on:
   push:
     branches: [main]
   workflow_dispatch:
 jobs:
-  build:
+  compile:
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -20,9 +20,22 @@ jobs:
       - uses: android-actions/setup-android@v3
         with:
           packages: "platform-tools platforms;android-35 build-tools;35.0.0"
-      - name: Build unsigned/debug recovery APK
+      - name: Compile detection and ignore controls
         run: gradle --no-daemon :app:assembleDebug
+      # Temporary debug keys are never distributed as user updates.
+      - name: Prepare and verify permanent release signing
+        id: signing
+        env:
+          WHOS_TEXTING_SIGNING_JSON: ${{ secrets.WHOS_TEXTING_SIGNING_JSON }}
+        run: python3 .github/scripts/prepare-signing.py
+      - name: Build signed release APK
+        run: gradle --no-daemon :app:assembleRelease
+      - name: Verify signed APK certificate
+        run: |
+          APK=app/build/outputs/apk/release/app-release.apk
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$APK" > certificate-verification.txt
+          grep -F "Signer #1 certificate SHA-256 digest: 0ddca6420e85894472899b0f531a6a7e718378d60e0ce8063ffc8dfd3058c9ca" certificate-verification.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: whosTexting-recovery-debug-DO-NOT-INSTALL-AS-UPDATE
-          path: app/build/outputs/apk/debug/*.apk
+          name: WhosTexting-permanent-signed-release
+          path: app/build/outputs/apk/release/app-release.apk
