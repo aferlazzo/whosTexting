@@ -8,6 +8,8 @@ import android.content.ComponentName;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.provider.Settings;
 import android.view.View;
 import android.widget.Button;
@@ -16,6 +18,13 @@ import android.widget.TextView;
 
 public final class MainActivity extends Activity {
     private TextView status;
+    private final Handler statusHandler = new Handler(Looper.getMainLooper());
+    private final Runnable statusUpdater = new Runnable() {
+        @Override public void run() {
+            refresh();
+            statusHandler.postDelayed(this, 1000);
+        }
+    };
     @Override public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         LinearLayout root = new LinearLayout(this);
@@ -50,7 +59,15 @@ public final class MainActivity extends Activity {
         Button b = new Button(this); b.setText(title); b.setAllCaps(false);
         b.setOnClickListener(v -> action.run()); root.addView(b);
     }
-    @Override protected void onResume() { super.onResume(); refresh(); }
+    @Override protected void onResume() {
+        super.onResume();
+        statusHandler.removeCallbacks(statusUpdater);
+        statusUpdater.run();
+    }
+    @Override protected void onPause() {
+        statusHandler.removeCallbacks(statusUpdater);
+        super.onPause();
+    }
     @Override public void onRequestPermissionsResult(int code, String[] permissions, int[] results) {
         super.onRequestPermissionsResult(code, permissions, results); refresh();
     }
