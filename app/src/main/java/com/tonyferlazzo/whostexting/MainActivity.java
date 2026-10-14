@@ -23,6 +23,7 @@ import android.widget.TextView;
 public final class MainActivity extends Activity {
     private TextView status;
     private TextView identityResult;
+    private TextView builtInResult;
     private Button ignoreButton;
     private final Handler statusHandler = new Handler(Looper.getMainLooper());
     private final Runnable statusUpdater = new Runnable() {
@@ -37,44 +38,51 @@ public final class MainActivity extends Activity {
         root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(36, 40, 36, 20);
         TextView heading = new TextView(this);
-        heading.setText("Who's Texting? — permission test");
+        heading.setText("Who's Texting?");
         heading.setTextSize(24);
         root.addView(heading);
+        add(root, "Run built-in test", this::runBuiltInTest);
+        builtInResult = new TextView(this);
+        builtInResult.setTextSize(18);
+        builtInResult.setPadding(0, 16, 0, 24);
+        builtInResult.setText("Tap once to test capture, ignore and undo using a sample number. No text message needed.");
+        root.addView(builtInResult);
+        LinearLayout details = new LinearLayout(this);
+        details.setOrientation(LinearLayout.VERTICAL);
+        details.setVisibility(View.GONE);
+        add(root, "Setup and live status", () ->
+            details.setVisibility(details.getVisibility() == View.GONE ? View.VISIBLE : View.GONE));
+        root.addView(details);
         status = new TextView(this);
         status.setTextSize(18);
         status.setPadding(0, 25, 0, 25);
-        root.addView(status);
-        add(root, "1. Allow notification access", () -> new AlertDialog.Builder(this)
+        details.addView(status);
+        add(details, "1. Allow notification access", () -> new AlertDialog.Builder(this)
             .setTitle("Sensitive notification access")
             .setMessage("Android gives notification listeners access to notifications from all apps. This app filters to Google Messages sender labels only; Android does not enforce that filter. Grant access only if you trust this app.")
             .setNegativeButton("Cancel", null)
             .setPositiveButton("Open Android settings", (d, w) -> startActivity(new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)))
             .show());
-        add(root, "2. Allow contacts read (optional)", () -> {
+        add(details, "2. Allow contacts read (optional)", () -> {
             if (android.os.Build.VERSION.SDK_INT >= 23 && checkSelfPermission(Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED)
                 requestPermissions(new String[]{Manifest.permission.READ_CONTACTS}, 10);
             else refresh();
         });
-        add(root, "3. Start fresh test", () -> { MessagesListener.count = 0; MessagesListener.allEvents = 0; MessagesListener.googleEvents = 0; MessagesListener.diagnostic = "Waiting for notification"; MessagesListener.lastSender = "No sender captured"; MessagesListener.testing = true; refresh(); });
-        add(root, "Stop test and erase", () -> { MessagesListener.testing = false; MessagesListener.count = 0; MessagesListener.allEvents = 0; MessagesListener.googleEvents = 0; MessagesListener.diagnostic = "Test stopped"; MessagesListener.lastSender = "No sender captured"; refresh(); });
-        add(root, "Check last sender in Contacts", this::checkLastSender);
-        add(root, "Test unknown sender (simulation)", () -> checkSender("5550100199", true));
-        add(root, "Test known contact (choose from Contacts)", () -> {
-            Intent pick = new Intent(Intent.ACTION_PICK, ContactsContract.CommonDataKinds.Phone.CONTENT_URI);
-            startActivityForResult(pick, 20);
-        });
+        add(details, "3. Start fresh test", () -> { MessagesListener.count = 0; MessagesListener.allEvents = 0; MessagesListener.googleEvents = 0; MessagesListener.diagnostic = "Waiting for notification"; MessagesListener.lastSender = "No sender captured"; MessagesListener.testing = true; refresh(); });
+        add(details, "Stop test and erase", () -> { MessagesListener.testing = false; MessagesListener.count = 0; MessagesListener.allEvents = 0; MessagesListener.googleEvents = 0; MessagesListener.diagnostic = "Test stopped"; MessagesListener.lastSender = "No sender captured"; refresh(); });
+        add(details, "Check last sender in Contacts", this::checkLastSender);
         ignoreButton = new Button(this);
         ignoreButton.setText("Ignore this number");
         ignoreButton.setAllCaps(false);
         ignoreButton.setOnClickListener(v -> ignoreLastSender());
-        root.addView(ignoreButton);
-        add(root, "Manage ignored numbers", this::manageIgnoredNumbers);
+        details.addView(ignoreButton);
+        add(details, "Manage ignored numbers", this::manageIgnoredNumbers);
         identityResult = new TextView(this);
         identityResult.setTextSize(18);
         identityResult.setPadding(0, 14, 0, 14);
         identityResult.setText("Identity: not checked");
-        root.addView(identityResult);
-        add(root, "Refresh status", this::refresh);
+        details.addView(identityResult);
+        add(details, "Refresh status", this::refresh);
         android.widget.ScrollView scroll = new android.widget.ScrollView(this);
         scroll.addView(root);
         setContentView(scroll);
@@ -107,6 +115,43 @@ public final class MainActivity extends Activity {
             identityResult.setText("Cannot read selected contact. Allow Contacts permission.");
         } catch (RuntimeException ex) {
             identityResult.setText("Selected contact could not be read.");
+        }
+    }
+    private void runBuiltInTest() {
+        // Reserved fictional sample. Never send a text, inspect contacts or change them.
+        final String sample = "(202) 555-0147";
+        final String key = MessagesListener.numberKey(sample);
+        final boolean wasIgnored = MessagesListener.isIgnored(this, sample);
+        final String previousSender = MessagesListener.lastSender;
+        final int previousCount = MessagesListener.count;
+        final String previousDiagnostic = MessagesListener.diagnostic;
+        boolean captured = false, ignored = false, restored = false;
+        try {
+            MessagesListener.setIgnored(this, key, false);
+            captured = MessagesListener.captureSender(this, sample)
+                && sample.equals(MessagesListener.lastSender)
+                && MessagesListener.count == previousCount + 1;
+            MessagesListener.setIgnored(this, key, true);
+            int beforeIgnored = MessagesListener.count;
+            ignored = MessagesListener.isIgnored(this, "+1 202-555-0147")
+                && !MessagesListener.captureSender(this, "+1 202-555-0147")
+                && MessagesListener.count == beforeIgnored;
+            MessagesListener.setIgnored(this, key, false);
+            restored = !MessagesListener.isIgnored(this, sample)
+                && MessagesListener.captureSender(this, sample)
+                && MessagesListener.count == beforeIgnored + 1;
+            builtInResult.setText((captured && ignored && restored
+                ? "PASS — capture, ignore and undo work."
+                : "Test needs attention. Capture: " + captured + "; ignore: " + ignored + "; undo: " + restored)
+                + "\n\nSample test only. This does not verify incoming Google Messages notifications. Your contacts and real event counts are unchanged.");
+        } catch (RuntimeException error) {
+            builtInResult.setText("Built-in test could not finish. No real text message was sent.");
+        } finally {
+            MessagesListener.setIgnored(this, key, wasIgnored);
+            MessagesListener.lastSender = previousSender;
+            MessagesListener.count = previousCount;
+            MessagesListener.diagnostic = previousDiagnostic;
+            refresh();
         }
     }
     private void checkLastSender() {
