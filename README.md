@@ -34,3 +34,17 @@ The prototype declares READ_CONTACTS and a notification listener. It does not de
 3. Build a properly signed update with the same identity, or explicitly choose a separate new installation.
 4. Address Android's restricted-settings notification-access policy through supported permission flows; never bypass protections or disable Play Protect globally.
 5. Test on the Pixel with real SMS and RCS notifications before adding identification and contact-saving features.
+
+## Clean Pixel installation — replacement build
+
+The previous WT app never passed its Pixel notification-access test. Its local data and upgrade signature do **not** need to be preserved. The rebuilt app can be installed fresh.
+
+1. In GitHub Actions, open the most recent **successful** `Android recovery build` run.
+2. Under **Artifacts**, download `whosTexting-recovery-debug-DO-NOT-INSTALL-AS-UPDATE`. Unzip it to obtain `app-debug.apk`. This is a **debug test build**, not a production release.
+3. On the Pixel, uninstall the old **Who's Texting?** app through Android Settings > Apps. This deletes its local data.
+4. Transfer `app-debug.apk` to the Pixel and open it from Files. Review Android's per-source installation approval and any Play Protect warning. **Do not disable Play Protect globally.**
+5. Open WT. Select **Allow notification access**, then approve it in Android's notification-listener settings.
+6. If Android says the setting is restricted or the switch is disabled, open Android Settings > Apps > Who's Texting? > App info. On Android versions that provide it, the upper-right menu may contain **Allow restricted settings**. Only enable it if you trust this exact APK and understand that notification listeners have broad access. If that option is absent, stop and record the screen; do not bypass Android's protections.
+7. Return to WT. Start a fresh test. Receive a **new** Google Messages notification from an unfamiliar sender, then refresh WT. This version does not read historical texts.
+
+**Important:** A green GitHub build confirms compilation, not notification permission on the Pixel. A debug APK sideload may itself trigger restricted-settings controls. If it does, prefer a trusted distribution/install route rather than repeatedly reinstalling or changing unrelated settings.
