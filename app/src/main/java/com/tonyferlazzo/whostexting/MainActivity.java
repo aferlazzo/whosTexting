@@ -58,6 +58,11 @@ public final class MainActivity extends Activity {
         add(root, "3. Start fresh test", () -> { MessagesListener.count = 0; MessagesListener.allEvents = 0; MessagesListener.googleEvents = 0; MessagesListener.diagnostic = "Waiting for notification"; MessagesListener.lastSender = "No sender captured"; MessagesListener.testing = true; refresh(); });
         add(root, "Stop test and erase", () -> { MessagesListener.testing = false; MessagesListener.count = 0; MessagesListener.allEvents = 0; MessagesListener.googleEvents = 0; MessagesListener.diagnostic = "Test stopped"; MessagesListener.lastSender = "No sender captured"; refresh(); });
         add(root, "Check last sender in Contacts", this::checkLastSender);
+        add(root, "Test unknown sender (simulation)", () -> checkSender("5550100199", true));
+        add(root, "Test known contact (choose from Contacts)", () -> {
+            Intent pick = new Intent(Intent.ACTION_PICK, ContactsContract.CommonDataKinds.Phone.CONTENT_URI);
+            startActivityForResult(pick, 20);
+        });
         ignoreButton = new Button(this);
         ignoreButton.setText("Ignore this number");
         ignoreButton.setAllCaps(false);
@@ -91,34 +96,51 @@ public final class MainActivity extends Activity {
     @Override public void onRequestPermissionsResult(int code, String[] permissions, int[] results) {
         super.onRequestPermissionsResult(code, permissions, results); refresh();
     }
+    @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode != 20 || resultCode != RESULT_OK || data == null || data.getData() == null) return;
+        try (Cursor cursor = getContentResolver().query(data.getData(),
+                new String[]{ContactsContract.CommonDataKinds.Phone.NUMBER}, null, null, null)) {
+            if (cursor != null && cursor.moveToFirst()) checkSender(cursor.getString(0), true);
+            else identityResult.setText("No phone number selected.");
+        } catch (SecurityException ex) {
+            identityResult.setText("Cannot read selected contact. Allow Contacts permission.");
+        } catch (RuntimeException ex) {
+            identityResult.setText("Selected contact could not be read.");
+        }
+    }
     private void checkLastSender() {
+        checkSender(MessagesListener.lastSender, false);
+    }
+    private void checkSender(String sender, boolean simulation) {
+        if (sender == null) sender = "";
+        String prefix = simulation ? "SIMULATED TEST — no message received.\\n" : "";
         if (checkSelfPermission(Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) {
-            identityResult.setText("Contacts permission required. Approve the Android prompt to check this number.");
-            requestPermissions(new String[]{Manifest.permission.READ_CONTACTS}, 10);
+            identityResult.setText(prefix + "Contacts permission required. Tap Allow contacts read, then retry.");
             return;
         }
-        String sender = MessagesListener.lastSender;
         if (MessagesListener.isIgnored(this, sender)) {
-            identityResult.setText("This number is ignored. Restore it under Manage ignored numbers to check it again.");
+            identityResult.setText(prefix + "This number is ignored.");
             return;
         }
         String digits = sender.replaceAll("[^0-9+]", "");
         if (digits.length() < 7 || digits.length() > 16 || !PhoneNumberUtils.isGlobalPhoneNumber(digits)) {
-            identityResult.setText("Identity: last sender is not a recognizable phone number.");
+            identityResult.setText(prefix + "No recognizable phone number.");
             return;
         }
         Uri uri = Uri.withAppendedPath(ContactsContract.PhoneLookup.CONTENT_FILTER_URI, Uri.encode(digits));
         try (Cursor cursor = getContentResolver().query(uri,
                 new String[]{ContactsContract.PhoneLookup.DISPLAY_NAME}, null, null, null)) {
             if (cursor != null && cursor.moveToFirst()) {
-                identityResult.setText("Saved contact: " + cursor.getString(0));
+                identityResult.setText(prefix + "Saved contact: " + cursor.getString(0));
             } else {
-                identityResult.setText("Unknown sender: " + sender + "\\nNot found in device Contacts. No business identity verified.");
+                identityResult.setText(prefix + "Unknown sender: " + sender +
+                    "\\nNot found in device Contacts. No business identity verified.");
             }
         } catch (SecurityException ex) {
-            identityResult.setText("Contacts access was denied.");
+            identityResult.setText(prefix + "Contacts access was denied.");
         } catch (RuntimeException ex) {
-            identityResult.setText("Contacts lookup unavailable. No identity inferred.");
+            identityResult.setText(prefix + "Contacts lookup unavailable. No identity inferred.");
         }
     }
     private void ignoreLastSender() {
