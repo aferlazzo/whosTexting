@@ -6,8 +6,25 @@ android {
         applicationId 'com.tonyferlazzo.whostexting'
         minSdk 26
         targetSdk 35
-        versionCode 4
-        versionName '0.3.0-ignore'
+        versionCode 5
+        versionName '0.3.1-ignore'
+    }
+    signingConfigs {
+        release {
+            def signingFile = System.getenv('WT_STORE_FILE')
+            if (signingFile) {
+                storeFile file(signingFile)
+                storePassword System.getenv('WT_STORE_PASSWORD')
+                keyAlias System.getenv('WT_KEY_ALIAS')
+                keyPassword System.getenv('WT_KEY_PASSWORD')
+                storeType 'PKCS12'
+            }
+        }
+    }
+    buildTypes {
+        release {
+            signingConfig signingConfigs.release
+        }
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
