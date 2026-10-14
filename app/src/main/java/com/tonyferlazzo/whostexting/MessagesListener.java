@@ -1,6 +1,10 @@
 package com.tonyferlazzo.whostexting;
 
 import android.app.Notification;
+import android.content.Context;
+import android.telephony.PhoneNumberUtils;
+import java.util.HashSet;
+import java.util.Set;
 import android.os.Bundle;
 import android.service.notification.NotificationListenerService;
 import android.service.notification.StatusBarNotification;
@@ -14,6 +18,30 @@ public final class MessagesListener extends NotificationListenerService {
     public static volatile int googleEvents = 0;
     public static volatile String diagnostic = "Waiting for notification";
     private static final String MESSAGES = "com.google.android.apps.messaging";
+
+    static String numberKey(String sender) {
+        if (sender == null || !sender.matches("[+0-9().\\s-]+")) return "";
+        String number = PhoneNumberUtils.normalizeNumber(sender);
+        if (!number.matches("\\+?[0-9]{3,15}")) return "";
+        // Treat common US local and country-code forms as the same sender.
+        if (number.matches("[0-9]{10}")) return "+1" + number;
+        if (number.matches("1[0-9]{10}")) return "+" + number;
+        return number;
+    }
+    static Set<String> ignoredNumbers(Context context) {
+        return new HashSet<>(context.getSharedPreferences("sender_preferences", Context.MODE_PRIVATE)
+            .getStringSet("ignored_numbers", java.util.Collections.emptySet()));
+    }
+    static boolean isIgnored(Context context, String sender) {
+        String number = numberKey(sender);
+        return !number.isEmpty() && ignoredNumbers(context).contains(number);
+    }
+    static void setIgnored(Context context, String number, boolean ignored) {
+        Set<String> numbers = ignoredNumbers(context);
+        if (ignored) numbers.add(number); else numbers.remove(number);
+        context.getSharedPreferences("sender_preferences", Context.MODE_PRIVATE)
+            .edit().putStringSet("ignored_numbers", numbers).apply();
+    }
 
     @Override public void onListenerConnected() {
         connected = true;
@@ -40,6 +68,10 @@ public final class MessagesListener extends NotificationListenerService {
         // Never inspect, retain or transmit message content.
         if (sender.isEmpty() || sender.length() > 100 || sender.contains(",") || sender.contains(" • ")) {
             diagnostic = "Sender title filtered";
+            return;
+        }
+        if (isIgnored(this, sender)) {
+            diagnostic = "Ignored sender skipped";
             return;
         }
         lastSender = sender;
