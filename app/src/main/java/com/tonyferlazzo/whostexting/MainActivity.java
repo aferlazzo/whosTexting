@@ -38,9 +38,18 @@ public final class MainActivity extends Activity {
         root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(36, 40, 36, 20);
         TextView heading = new TextView(this);
-        heading.setText("Who's Texting?");
+        heading.setText("Who's Texting? 0.3.3");
         heading.setTextSize(24);
         root.addView(heading);
+        TextView currentResult = new TextView(this);
+        currentResult.setTextSize(18);
+        currentResult.setPadding(0, 14, 0, 14);
+        currentResult.setText("Check a Google Messages notification already showing on your phone. No new text needed.");
+        add(root, "Check current Messages notifications", () -> {
+            currentResult.setText(MessagesListener.checkCurrentMessages());
+            refresh();
+        });
+        root.addView(currentResult);
         add(root, "Run built-in test", this::runBuiltInTest);
         builtInResult = new TextView(this);
         builtInResult.setTextSize(18);
@@ -68,8 +77,8 @@ public final class MainActivity extends Activity {
                 requestPermissions(new String[]{Manifest.permission.READ_CONTACTS}, 10);
             else refresh();
         });
-        add(details, "3. Start fresh test", () -> { MessagesListener.count = 0; MessagesListener.allEvents = 0; MessagesListener.googleEvents = 0; MessagesListener.diagnostic = "Waiting for notification"; MessagesListener.lastSender = "No sender captured"; MessagesListener.testing = true; refresh(); });
-        add(details, "Stop test and erase", () -> { MessagesListener.testing = false; MessagesListener.count = 0; MessagesListener.allEvents = 0; MessagesListener.googleEvents = 0; MessagesListener.diagnostic = "Test stopped"; MessagesListener.lastSender = "No sender captured"; refresh(); });
+        add(details, "3. Start fresh test", () -> { MessagesListener.count = 0; MessagesListener.allEvents = 0; MessagesListener.googleEvents = 0; MessagesListener.diagnostic = "Waiting for notification"; MessagesListener.lastSender = "No sender captured"; MessagesListener.setTesting(this, true); refresh(); });
+        add(details, "Stop test and erase", () -> { MessagesListener.setTesting(this, false); MessagesListener.count = 0; MessagesListener.allEvents = 0; MessagesListener.googleEvents = 0; MessagesListener.diagnostic = "Test stopped"; MessagesListener.lastSender = "No sender captured"; refresh(); });
         add(details, "Check last sender in Contacts", this::checkLastSender);
         ignoreButton = new Button(this);
         ignoreButton.setText("Ignore this number");
