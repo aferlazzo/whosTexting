@@ -17,6 +17,7 @@ public final class MessagesListener extends NotificationListenerService {
     public static volatile int allEvents = 0;
     public static volatile int googleEvents = 0;
     public static volatile String diagnostic = "Waiting for notification";
+    private static volatile MessagesListener activeListener;
     private static final String MESSAGES = "com.google.android.apps.messaging";
 
     static String numberKey(String sender) {
@@ -43,12 +44,26 @@ public final class MessagesListener extends NotificationListenerService {
             .edit().putStringSet("ignored_numbers", numbers).apply();
     }
 
+    static void setTesting(Context context, boolean enabled) {
+        testing = enabled;
+        context.getSharedPreferences("sender_preferences", Context.MODE_PRIVATE)
+            .edit().putBoolean("live_test_running", enabled).apply();
+    }
+
+    @Override public void onCreate() {
+        super.onCreate();
+        testing = getSharedPreferences("sender_preferences", Context.MODE_PRIVATE)
+            .getBoolean("live_test_running", false);
+    }
+
     @Override public void onListenerConnected() {
+        activeListener = this;
         connected = true;
         super.onListenerConnected();
     }
     @Override public void onListenerDisconnected() {
         connected = false;
+        activeListener = null;
         super.onListenerDisconnected();
     }
     @Override public void onNotificationPosted(StatusBarNotification sbn) {
@@ -57,20 +72,67 @@ public final class MessagesListener extends NotificationListenerService {
         if (!MESSAGES.equals(sbn.getPackageName())) return;
         googleEvents++;
         diagnostic = "Google Messages notification received";
-        Notification n = sbn.getNotification();
-        if (n == null) { diagnostic = "Notification object missing"; return; }
-        if ((n.flags & Notification.FLAG_GROUP_SUMMARY) != 0) { diagnostic = "Group summary filtered"; return; }
-        Bundle extras = n.extras;
-        if (extras == null) { diagnostic = "No notification extras"; return; }
-        CharSequence title = extras.getCharSequence(Notification.EXTRA_TITLE);
-        if (title == null) { diagnostic = "Sender title missing"; return; }
-        String sender = title.toString().trim();
-        // Never inspect, retain or transmit message content.
-        if (sender.isEmpty() || sender.length() > 100 || sender.contains(",") || sender.contains(" • ")) {
-            diagnostic = "Sender title filtered";
-            return;
+        String sender = senderTitle(sbn.getNotification());
+        if (sender != null) captureSender(this, sender);
+    }
+
+    @Override public void onDestroy() {
+        if (activeListener == this) {
+            activeListener = null;
+            connected = false;
         }
-        captureSender(this, sender);
+        super.onDestroy();
+    }
+
+    private static String senderTitle(Notification n) {
+        if (n == null) { diagnostic = "Notification object missing"; return null; }
+        if ((n.flags & Notification.FLAG_GROUP_SUMMARY) != 0) {
+            diagnostic = "Group summary filtered"; return null;
+        }
+        Bundle extras = n.extras;
+        if (extras == null) { diagnostic = "No notification extras"; return null; }
+        CharSequence title = extras.getCharSequence(Notification.EXTRA_TITLE);
+        if (title == null) { diagnostic = "Sender title missing"; return null; }
+        String sender = title.toString().trim();
+        // Only inspect sender labels. Never inspect, retain or transmit message bodies.
+        if (sender.isEmpty() || sender.length() > 100 || sender.contains(",") || sender.contains(" • ")) {
+            diagnostic = "Sender title filtered"; return null;
+        }
+        return sender;
+    }
+
+    static String checkCurrentMessages() {
+        MessagesListener listener = activeListener;
+        if (listener == null || !connected)
+            return "Listener is not connected. Open Setup and live status to check notification access.";
+        try {
+            StatusBarNotification[] notifications = listener.getActiveNotifications();
+            if (notifications == null)
+                return "Android did not return current notifications.";
+            java.util.Arrays.sort(notifications, (left, right) ->
+                Long.compare(right.getPostTime(), left.getPostTime()));
+            int messages = 0;
+            for (StatusBarNotification notification : notifications) {
+                if (!MESSAGES.equals(notification.getPackageName())) continue;
+                messages++;
+                String sender = senderTitle(notification.getNotification());
+                if (sender == null || isIgnored(listener, sender)) continue;
+                // A snapshot is separate from live event counters.
+                lastSender = sender;
+                diagnostic = "Sender found in a current Google Messages notification";
+                return "Current Google Messages sender: " + sender
+                    + "\n\nThis is a notification already showing on your phone, not a newly received text.";
+            }
+            diagnostic = messages == 0 ? "No current Google Messages notifications accessible"
+                : "Current Google Messages notifications were ignored or filtered";
+            return messages == 0
+                ? "No current Google Messages notification is accessible to this app. A visible notification may be excluded by Android's access settings."
+                : "Google Messages notifications are present, but no individual unignored sender label is available.";
+        } catch (SecurityException error) {
+            return "Android denied access to current notifications. Check notification access under Setup and live status.";
+        } catch (RuntimeException error) {
+            return "Current notification check could not finish. Your messages and contacts were not changed.";
+        }
     }
 
     // Shared by real notification handling and the clearly labeled built-in test.
