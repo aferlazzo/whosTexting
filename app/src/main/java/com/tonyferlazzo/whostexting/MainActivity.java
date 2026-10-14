@@ -23,6 +23,7 @@ import android.widget.TextView;
 public final class MainActivity extends Activity {
     private TextView status;
     private TextView identityResult;
+    private Button ignoreButton;
     private final Handler statusHandler = new Handler(Looper.getMainLooper());
     private final Runnable statusUpdater = new Runnable() {
         @Override public void run() {
@@ -57,13 +58,21 @@ public final class MainActivity extends Activity {
         add(root, "3. Start fresh test", () -> { MessagesListener.count = 0; MessagesListener.allEvents = 0; MessagesListener.googleEvents = 0; MessagesListener.diagnostic = "Waiting for notification"; MessagesListener.lastSender = "No sender captured"; MessagesListener.testing = true; refresh(); });
         add(root, "Stop test and erase", () -> { MessagesListener.testing = false; MessagesListener.count = 0; MessagesListener.allEvents = 0; MessagesListener.googleEvents = 0; MessagesListener.diagnostic = "Test stopped"; MessagesListener.lastSender = "No sender captured"; refresh(); });
         add(root, "Check last sender in Contacts", this::checkLastSender);
+        ignoreButton = new Button(this);
+        ignoreButton.setText("Ignore this number");
+        ignoreButton.setAllCaps(false);
+        ignoreButton.setOnClickListener(v -> ignoreLastSender());
+        root.addView(ignoreButton);
+        add(root, "Manage ignored numbers", this::manageIgnoredNumbers);
         identityResult = new TextView(this);
         identityResult.setTextSize(18);
         identityResult.setPadding(0, 14, 0, 14);
         identityResult.setText("Identity: not checked");
         root.addView(identityResult);
         add(root, "Refresh status", this::refresh);
-        setContentView(root);
+        android.widget.ScrollView scroll = new android.widget.ScrollView(this);
+        scroll.addView(root);
+        setContentView(scroll);
         refresh();
     }
     private void add(LinearLayout root, String title, Runnable action) {
@@ -89,6 +98,10 @@ public final class MainActivity extends Activity {
             return;
         }
         String sender = MessagesListener.lastSender;
+        if (MessagesListener.isIgnored(this, sender)) {
+            identityResult.setText("This number is ignored. Restore it under Manage ignored numbers to check it again.");
+            return;
+        }
         String digits = sender.replaceAll("[^0-9+]", "");
         if (digits.length() < 7 || digits.length() > 16 || !PhoneNumberUtils.isGlobalPhoneNumber(digits)) {
             identityResult.setText("Identity: last sender is not a recognizable phone number.");
@@ -108,8 +121,37 @@ public final class MainActivity extends Activity {
             identityResult.setText("Contacts lookup unavailable. No identity inferred.");
         }
     }
+    private void ignoreLastSender() {
+        String sender = MessagesListener.lastSender;
+        String number = MessagesListener.numberKey(sender);
+        if (number.isEmpty()) {
+            identityResult.setText("No recognizable sender number to ignore.");
+            return;
+        }
+        MessagesListener.setIgnored(this, number, true);
+        MessagesListener.lastSender = "No sender captured";
+        identityResult.setText("Ignored: " + number + "\nFuture identification prompts from this number will be skipped. Texts will still arrive in Google Messages.");
+        refresh();
+    }
+    private void manageIgnoredNumbers() {
+        java.util.Set<String> ignored = MessagesListener.ignoredNumbers(this);
+        if (ignored.isEmpty()) {
+            new AlertDialog.Builder(this).setTitle("Ignored numbers")
+                .setMessage("No numbers ignored.").setPositiveButton("OK", null).show();
+            return;
+        }
+        String[] numbers = ignored.toArray(new String[0]);
+        java.util.Arrays.sort(numbers);
+        new AlertDialog.Builder(this).setTitle("Tap a number to stop ignoring it")
+            .setItems(numbers, (dialog, which) -> {
+                MessagesListener.setIgnored(this, numbers[which], false);
+                identityResult.setText("Restored: " + numbers[which] + "\nNew notifications from this number can be checked again.");
+                refresh();
+            }).setNegativeButton("Close", null).show();
+    }
     private void refresh() {
         if (status == null) return;
+        ignoreButton.setEnabled(!MessagesListener.numberKey(MessagesListener.lastSender).isEmpty());
         NotificationManager manager = (NotificationManager)getSystemService(NOTIFICATION_SERVICE);
         boolean access = manager != null && manager.isNotificationListenerAccessGranted(new ComponentName(this, MessagesListener.class));
         boolean contacts = checkSelfPermission(Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED;
@@ -122,6 +164,7 @@ public final class MainActivity extends Activity {
             "\nDiagnostic: " + MessagesListener.diagnostic +
             "\nGoogle Messages events: " + MessagesListener.count +
             "\nLast sender label: " + MessagesListener.lastSender +
+            "\nIgnored numbers: " + MessagesListener.ignoredNumbers(this).size() +
             "\n\nAndroid may restrict notification access for sideloaded APKs. Do not disable Play Protect globally.");
     }
 }
