@@ -50,6 +50,13 @@ public final class SenderActivity extends Activity {
                 builder.setStyle(new Notification.MessagingStyle(recipient)
                     .addMessage("Synthetic emulator test body", System.currentTimeMillis(), from));
             }
+            if (getIntent().getBooleanExtra("grouped_summary", false)) {
+                builder.setGroup("fixture-group").setGroupSummary(true).setContentTitle("Messages");
+                android.text.SpannableString line = new android.text.SpannableString(sender + " Synthetic body");
+                line.setSpan(new android.text.style.StyleSpan(android.graphics.Typeface.BOLD), 0, sender.length(),
+                    android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                builder.setStyle(new Notification.InboxStyle().addLine(line));
+            }
             manager.notify(getIntent().getIntExtra("notification_id", 101), builder.build());
         }
         finish();

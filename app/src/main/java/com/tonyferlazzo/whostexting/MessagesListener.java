@@ -77,13 +77,11 @@ public final class MessagesListener extends NotificationListenerService {
         if (!MESSAGES.equals(sbn.getPackageName())) return;
         googleEvents++;
         diagnostic = "Google Messages notification received";
-        String sender = senderTitle(sbn.getNotification());
-        if (sender != null) {
-            String number = senderNumber(sbn.getNotification(), sender);
-            if (isIgnored(this, number)) { diagnostic = "Ignored sender skipped"; return; }
-            if (captureSender(this, sender)) {
-                lastNumber = number;
-                SenderStore.record(this, sender, number);
+        for (SenderStore.Sender row : notificationSenders(sbn.getNotification())) {
+            if (isIgnored(this, row.number)) { diagnostic = "Ignored sender skipped"; continue; }
+            if (captureSender(this, row.label)) {
+                lastNumber = row.number;
+                SenderStore.record(this, row.label, row.number, sbn.getPostTime());
             }
         }
     }
@@ -139,6 +137,61 @@ public final class MessagesListener extends NotificationListenerService {
         return people != null && people.length == 1 ? numberKey(people[0]) : "";
     }
 
+    static java.util.List<SenderStore.Sender> notificationSenders(Notification notification) {
+        java.util.List<SenderStore.Sender> senders = new java.util.ArrayList<>();
+        if (notification == null) { diagnostic = "Notification object missing"; return senders; }
+        if ((notification.flags & Notification.FLAG_GROUP_SUMMARY) == 0) {
+            String label = senderTitle(notification);
+            if (label != null) senders.add(new SenderStore.Sender(label, senderNumber(notification, label), 0));
+            return senders;
+        }
+        Bundle extras = notification.extras;
+        if (extras == null) { diagnostic = "Grouped notification has no sender metadata"; return senders; }
+        // Only explicit sender metadata, never message text or the group title.
+        android.os.Parcelable[] messages = extras.getParcelableArray("android.messages");
+        if (messages != null) for (android.os.Parcelable value : messages) {
+            if (!(value instanceof Bundle)) continue;
+            Bundle message = (Bundle)value;
+            String label = "", number = "";
+            if (android.os.Build.VERSION.SDK_INT >= 28) {
+                android.os.Parcelable personValue = message.getParcelable("sender_person");
+                if (personValue instanceof android.app.Person) {
+                    android.app.Person person = (android.app.Person)personValue;
+                    label = person.getName() == null ? "" : person.getName().toString().trim();
+                    number = numberKey(person.getUri());
+                }
+            }
+            if (label.isEmpty()) {
+                CharSequence sender = message.getCharSequence("sender");
+                if (sender != null) label = sender.toString().trim();
+            }
+            if (number.isEmpty()) number = numberKey(label);
+            if (!label.isEmpty() && label.length() <= 160)
+                senders.add(new SenderStore.Sender(label, number, 0));
+        }
+        // InboxStyle summaries can mark sender labels with a leading bold span.
+        // Extract only a full phone-number label in that span, never adjacent text.
+        CharSequence[] lines = extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES);
+        if (lines != null) for (CharSequence line : lines) {
+            if (!(line instanceof android.text.Spanned)) continue;
+            android.text.Spanned styled = (android.text.Spanned)line;
+            android.text.style.StyleSpan[] spans = styled.getSpans(0, styled.length(), android.text.style.StyleSpan.class);
+            for (android.text.style.StyleSpan span : spans) {
+                int start = styled.getSpanStart(span), end = styled.getSpanEnd(span);
+                if (start != 0 || end <= start || end > 40
+                    || (span.getStyle() & android.graphics.Typeface.BOLD) == 0) continue;
+                String label = styled.subSequence(start, end).toString().trim().replaceAll("[:\\s]+$", "");
+                String number = numberKey(label);
+                if (number.replaceAll("[^0-9]", "").length() >= 7)
+                    senders.add(new SenderStore.Sender(label, number, 0));
+            }
+        }
+        java.util.Set<String> seen = new java.util.HashSet<>();
+        senders.removeIf(row -> !seen.add(row.id));
+        if (senders.isEmpty()) diagnostic = "Grouped notification has no usable sender metadata";
+        return senders;
+    }
+
     static String checkCurrentMessages() {
         MessagesListener listener = activeListener;
         if (listener == null || !connected)
@@ -154,15 +207,14 @@ public final class MessagesListener extends NotificationListenerService {
             for (StatusBarNotification notification : notifications) {
                 if (!MESSAGES.equals(notification.getPackageName())) continue;
                 messages++;
-                String sender = senderTitle(notification.getNotification());
-                if (sender == null) continue;
-                String number = senderNumber(notification.getNotification(), sender);
-                if (isIgnored(listener, sender) || isIgnored(listener, number)) continue;
-                // A snapshot is separate from live event counters.
-                lastSender = sender;
-                lastNumber = number;
-                SenderStore.record(listener, sender, number, notification.getPostTime());
-                recovered.add(number.isEmpty() ? "label:" + sender : number);
+                for (SenderStore.Sender row : notificationSenders(notification.getNotification())) {
+                    if (isIgnored(listener, row.label) || isIgnored(listener, row.number)) continue;
+                    // A snapshot is separate from live event counters.
+                    lastSender = row.label;
+                    lastNumber = row.number;
+                    SenderStore.record(listener, row.label, row.number, notification.getPostTime());
+                    recovered.add(row.id);
+                }
             }
             if (!recovered.isEmpty()) {
                 diagnostic = "Recovered " + recovered.size() + " sender(s) from current Google Messages notifications";

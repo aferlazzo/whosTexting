@@ -29,6 +29,10 @@ public final class NotificationDeliveryTest {
         context.startActivity(intent);
     }
 
+    @Test public void groupedSenderLabelsExcludeMessageContent() {
+        NotificationBuilderTests.verify(context);
+    }
+
     @Test public void androidDeliversCapturesIgnoresRestoresAndSnapshots() {
         String flat = "(202) 555-0147";
         String conversation = "(202) 555-0188";
@@ -109,6 +113,16 @@ public final class NotificationDeliveryTest {
                 row.number.equals("+12025550177")));
             assertEquals("Newest sender remains first", "+12025550188", SenderStore.read(context).get(0).number);
             MessagesListener.setTesting(context, true);
+
+            // A grouped notification can expose an unknown sender even without a standalone child.
+            Intent summary = new Intent().setComponent(clear.getComponent());
+            summary.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK).putExtra("sender", "(202) 555-0166")
+                .putExtra("notification_id", 301).putExtra("grouped_summary", true);
+            context.startActivity(summary);
+            await("Grouped sender number must be recovered from current notifications", () -> {
+                MessagesListener.checkCurrentMessages();
+                return SenderStore.read(context).stream().anyMatch(row -> row.number.equals("+12025550166"));
+            });
 
             // Running state is retained in private settings rather than only RAM.
             assertTrue(context.getSharedPreferences("sender_preferences", Context.MODE_PRIVATE)
