@@ -121,7 +121,7 @@ public final class MainActivity extends Activity {
         if (!busy && nameInput.getText().toString().trim().isEmpty() && proposal == null) {
             for (SenderStore.Sender candidate : recent) {
                 if (!MessagesListener.isIgnored(this, candidate.number)) {
-                    if (selected == null || !selected.id.equals(candidate.id)) select(candidate);
+                    if (selected == null) select(candidate);
                     break;
                 }
             }
@@ -132,7 +132,9 @@ public final class MainActivity extends Activity {
         selected = sender; proposal = null; nameInput.setText("");
         senderText.setText(sender.label + (sender.number.isEmpty() || sender.label.equals(sender.number)
             ? "" : "\n" + sender.number));
-        lookupText.setText("No business identity checked yet. Lookup results are proposals, not verified senders.");
+        lookupText.setText(sender.number.isEmpty()
+            ? "Google Messages did not supply a phone number for this sender. Business lookup requires a number."
+            : "No business identity checked yet. Lookup results are proposals, not verified senders.");
         updateContact(); updateButtons();
     }
     private void updateContact() {
@@ -231,7 +233,8 @@ public final class MainActivity extends Activity {
         if (recent.isEmpty()) { lookupText.setText("No senders captured here yet. This app does not read historical texts."); return; }
         String[] labels = new String[recent.size()];
         for (int i = 0; i < labels.length; i++) labels[i] = recent.get(i).label
-            + (recent.get(i).number.isEmpty() ? "" : " · " + recent.get(i).number);
+            + (recent.get(i).number.isEmpty() ? " · no phone number supplied" : " · " + recent.get(i).number)
+            + " · " + android.text.format.DateFormat.format("MMM d, h:mm a", recent.get(i).time);
         new AlertDialog.Builder(this).setTitle("Recent captured senders")
             .setItems(labels, (dialog, which) -> select(recent.get(which))).setNegativeButton("Close", null).show();
     }
