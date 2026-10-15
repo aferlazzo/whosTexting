@@ -76,11 +76,18 @@ public final class MainActivity extends Activity {
         });
         button(root, "Diagnostics and privacy", this::showDiagnostics);
         text(root, "© Anthony Ferlazzo, 2026").setTextSize(12);
-        ScrollView scroll = new ScrollView(this); scroll.addView(root); setContentView(scroll);
+        ScrollView scroll = new ScrollView(this); scroll.setBackgroundColor(android.graphics.Color.WHITE);
+        scroll.addView(root); setContentView(scroll);
+        getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
+        if (android.os.Build.VERSION.SDK_INT >= 30 && getWindow().getInsetsController() != null) {
+            getWindow().getInsetsController().setSystemBarsAppearance(
+                android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS | android.view.WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS,
+                android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS | android.view.WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS);
+        }
         updateButtons(); refresh();
     }
     private TextView text(LinearLayout parent, String value) {
-        TextView view = new TextView(this); view.setTextSize(18); view.setText(value);
+        TextView view = new TextView(this); view.setTextSize(18); view.setTextColor(android.graphics.Color.rgb(27, 52, 64)); view.setText(value);
         view.setPadding(0, 10, 0, 10); parent.addView(view); return view;
     }
     private Button button(LinearLayout parent, String title, Runnable action) {
