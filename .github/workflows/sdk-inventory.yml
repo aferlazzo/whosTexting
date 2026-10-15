@@ -1,0 +1,31 @@
+name: Inspect Android SDK availability
+on:
+  push:
+    branches: [sdk-availability-check]
+permissions:
+  contents: read
+jobs:
+  catalog:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: "platform-tools"
+      - name: Record actual SDK catalog
+        run: |
+          sdkmanager --list --channel=3 > sdk-package-list.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          lines = Path("sdk-package-list.txt").read_text().splitlines()
+          for line in lines:
+              if any(word in line.lower() for word in ("android-37", "cinnamon", "android-36", "android-baklava")):
+                  print(line)
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-sdk-catalog
+          path: sdk-package-list.txt
