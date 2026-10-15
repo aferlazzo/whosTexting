@@ -12,7 +12,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        api: [35, 36, 37]
+        include:
+          - api: 35
+            target: default
+          - api: 36
+            target: default
+          - api: '37.0'
+            target: google_apis
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -37,7 +43,7 @@ jobs:
         with:
           api-level: ${{ matrix.api }}
           arch: x86_64
-          target: default
+          target: ${{ matrix.target }}
           disable-animations: true
           script: |
             adb install app/build/outputs/apk/debug/app-debug.apk
