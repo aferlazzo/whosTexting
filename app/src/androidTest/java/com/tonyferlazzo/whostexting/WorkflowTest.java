@@ -65,13 +65,26 @@ public final class WorkflowTest {
         SenderStore.clear(context);
         SenderStore.record(context, phone, phone);
         try (ActivityScenario<MainActivity> activity = ActivityScenario.launch(MainActivity.class)) {
+            captureScreen("review-screen.png");
             onView(withContentDescription("Name you approve for this number")).perform(replaceText("Approved sample"), closeSoftKeyboard());
             onView(withText("Review and save contact")).perform(scrollTo(), click());
             onView(withText("Approve this contact draft?")).check(matches(isDisplayed()));
+            captureScreen("approval-screen.png");
             onView(withText("Cancel")).perform(click());
             // Canceling approval leaves the fictional number absent from Contacts.
             assertEquals("", ContactActions.existingName(context, phone));
         } finally { SenderStore.clear(context); }
+    }
+
+    private void captureScreen(String name) {
+        android.graphics.Bitmap image = InstrumentationRegistry.getInstrumentation().getUiAutomation().takeScreenshot();
+        assertNotNull("UI screenshot must be available", image);
+        java.io.File directory = new java.io.File(context.getExternalFilesDir(null), "qa");
+        directory.mkdirs();
+        try (java.io.FileOutputStream output = new java.io.FileOutputStream(new java.io.File(directory, name))) {
+            assertTrue(image.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, output));
+        } catch (java.io.IOException error) { throw new AssertionError(error); }
+        finally { image.recycle(); }
     }
 
     @Test public void publicDirectorySmokeTest() {
