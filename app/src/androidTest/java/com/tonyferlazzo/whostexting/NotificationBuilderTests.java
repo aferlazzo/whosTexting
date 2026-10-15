@@ -32,13 +32,17 @@ final class NotificationBuilderTests {
         line.setSpan(new StyleSpan(Typeface.BOLD), 0, label.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         int bodyNumber = line.toString().indexOf("(202) 555-0199");
         line.setSpan(new StyleSpan(Typeface.BOLD), bodyNumber, line.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-        builder.setStyle(new Notification.InboxStyle().addLine(line));
+        builder = new Notification.Builder(context, "fixture")
+            .setSmallIcon(android.R.drawable.sym_action_chat).setGroup("fixture").setGroupSummary(true)
+            .setContentTitle("Messages").setStyle(new Notification.InboxStyle().addLine(line));
         List<SenderStore.Sender> inbox = MessagesListener.notificationSenders(builder.build());
         assertEquals("Only the leading sender-number span is used", 1, inbox.size());
         assertEquals("+12025550166", inbox.get(0).number);
         assertFalse(inbox.get(0).label.contains("Body"));
 
-        builder.setStyle(new Notification.InboxStyle().addLine("Plain body mentions (202) 555-0199"));
+        builder = new Notification.Builder(context, "fixture")
+            .setSmallIcon(android.R.drawable.sym_action_chat).setGroup("fixture").setGroupSummary(true)
+            .setContentTitle("Messages").setStyle(new Notification.InboxStyle().addLine("Plain body mentions (202) 555-0199"));
         assertTrue("Unstructured summary text must not be treated as a sender",
             MessagesListener.notificationSenders(builder.build()).isEmpty());
     }
