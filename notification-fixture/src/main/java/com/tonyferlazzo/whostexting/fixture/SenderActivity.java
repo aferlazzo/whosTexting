@@ -50,7 +50,7 @@ public final class SenderActivity extends Activity {
                 builder.setStyle(new Notification.MessagingStyle(recipient)
                     .addMessage("Synthetic emulator test body", System.currentTimeMillis(), from));
             }
-            manager.notify(101, builder.build());
+            manager.notify(getIntent().getIntExtra("notification_id", 101), builder.build());
         }
         finish();
     }

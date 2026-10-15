@@ -58,7 +58,7 @@ public final class NotificationDeliveryTest {
             assertEquals("Ignored sender not captured", "No sender captured", MessagesListener.lastSender);
             assertEquals("Ignore does not increase captures", captures, MessagesListener.count);
             assertFalse("Snapshot also respects ignore rule",
-                MessagesListener.checkCurrentMessages().startsWith("Current Google Messages sender:"));
+                MessagesListener.checkCurrentMessages().startsWith("Recovered "));
 
             MessagesListener.setIgnored(context, key, false);
             post(flat, false);
@@ -84,6 +84,31 @@ public final class NotificationDeliveryTest {
             assertEquals("WT Known Contact", ContactActions.existingName(context, "+12025550198"));
             assertTrue(SenderStore.read(context).stream().anyMatch(row ->
                 row.number.equals("+12025550198") && row.label.equals("WT Known Contact")));
+
+            // Recover multiple existing notifications after missed live delivery.
+            MessagesListener.setTesting(context, false);
+            SenderStore.clear(context);
+            Intent clear = new Intent().setComponent(new ComponentName("com.google.android.apps.messaging",
+                "com.tonyferlazzo.whostexting.fixture.SenderActivity"));
+            clear.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK).putExtra("clear", true);
+            context.startActivity(clear);
+            SystemClock.sleep(500);
+            Intent older = new Intent().setComponent(clear.getComponent());
+            older.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK).putExtra("sender", "(202) 555-0177")
+                .putExtra("notification_id", 201);
+            context.startActivity(older);
+            SystemClock.sleep(500);
+            Intent newer = new Intent().setComponent(clear.getComponent());
+            newer.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK).putExtra("sender", "(202) 555-0188")
+                .putExtra("notification_id", 202);
+            context.startActivity(newer);
+            SystemClock.sleep(500);
+            String recovered = MessagesListener.checkCurrentMessages();
+            assertTrue("Snapshot must recover every current sender", recovered.startsWith("Recovered 2"));
+            assertTrue("Older unknown sender retained", SenderStore.read(context).stream().anyMatch(row ->
+                row.number.equals("+12025550177")));
+            assertEquals("Newest sender remains first", "+12025550188", SenderStore.read(context).get(0).number);
+            MessagesListener.setTesting(context, true);
 
             // Running state is retained in private settings rather than only RAM.
             assertTrue(context.getSharedPreferences("sender_preferences", Context.MODE_PRIVATE)

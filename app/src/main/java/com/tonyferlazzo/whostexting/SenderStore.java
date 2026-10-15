@@ -31,10 +31,15 @@ final class SenderStore {
         return result;
     }
     static synchronized void record(Context context, String label, String number) {
+        record(context, label, number, System.currentTimeMillis());
+    }
+    static synchronized void record(Context context, String label, String number, long timestamp) {
         List<Sender> history = read(context);
-        Sender latest = new Sender(label, number, System.currentTimeMillis());
+        Sender latest = new Sender(label, number, timestamp);
+        for (Sender row : history) if (row.id.equals(latest.id) && row.time > timestamp) return;
         history.removeIf(row -> row.id.equals(latest.id));
         history.add(0, latest);
+        history.sort((left, right) -> Long.compare(right.time, left.time));
         JSONArray data = new JSONArray();
         for (int i = 0; i < history.size() && i < LIMIT; i++) {
             Sender row = history.get(i);

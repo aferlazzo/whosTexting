@@ -99,7 +99,9 @@ public final class MainActivity extends Activity {
         return manager != null && manager.isNotificationListenerAccessGranted(new ComponentName(this, MessagesListener.class));
     }
     @Override protected void onResume() {
-        super.onResume(); handler.removeCallbacks(updater); updater.run(); updateContact();
+        super.onResume();
+        if (hasAccess() && MessagesListener.connected && MessagesListener.testing) MessagesListener.checkCurrentMessages();
+        handler.removeCallbacks(updater); updater.run(); updateContact();
     }
     @Override protected void onPause() { handler.removeCallbacks(updater); super.onPause(); }
     @Override protected void onDestroy() { handler.removeCallbacks(updater); worker.shutdownNow(); super.onDestroy(); }

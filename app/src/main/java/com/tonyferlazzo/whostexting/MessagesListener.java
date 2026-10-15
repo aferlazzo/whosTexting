@@ -142,14 +142,15 @@ public final class MessagesListener extends NotificationListenerService {
     static String checkCurrentMessages() {
         MessagesListener listener = activeListener;
         if (listener == null || !connected)
-            return "Listener is not connected. Open Setup and live status to check notification access.";
+            return "Listener is not connected. Check notification access on the main screen.";
         try {
             StatusBarNotification[] notifications = listener.getActiveNotifications();
             if (notifications == null)
                 return "Android did not return current notifications.";
             java.util.Arrays.sort(notifications, (left, right) ->
-                Long.compare(right.getPostTime(), left.getPostTime()));
+                Long.compare(left.getPostTime(), right.getPostTime()));
             int messages = 0;
+            java.util.Set<String> recovered = new java.util.HashSet<>();
             for (StatusBarNotification notification : notifications) {
                 if (!MESSAGES.equals(notification.getPackageName())) continue;
                 messages++;
@@ -160,10 +161,13 @@ public final class MessagesListener extends NotificationListenerService {
                 // A snapshot is separate from live event counters.
                 lastSender = sender;
                 lastNumber = number;
-                SenderStore.record(listener, sender, number);
-                diagnostic = "Sender found in a current Google Messages notification";
-                return "Current Google Messages sender: " + sender
-                    + "\n\nThis is a notification already showing on your phone, not a newly received text.";
+                SenderStore.record(listener, sender, number, notification.getPostTime());
+                recovered.add(number.isEmpty() ? "label:" + sender : number);
+            }
+            if (!recovered.isEmpty()) {
+                diagnostic = "Recovered " + recovered.size() + " sender(s) from current Google Messages notifications";
+                return diagnostic + "\nLatest sender: " + lastSender
+                    + "\nAll recovered senders are in Recent senders. These are currently showing notifications, not historical texts.";
             }
             diagnostic = messages == 0 ? "No current Google Messages notifications accessible"
                 : "Current Google Messages notifications were ignored or filtered";
@@ -171,7 +175,7 @@ public final class MessagesListener extends NotificationListenerService {
                 ? "No current Google Messages notification is accessible to this app. A visible notification may be excluded by Android's access settings."
                 : "Google Messages notifications are present, but no individual unignored sender label is available.";
         } catch (SecurityException error) {
-            return "Android denied access to current notifications. Check notification access under Setup and live status.";
+            return "Android denied access to current notifications. Check notification access on the main screen.";
         } catch (RuntimeException error) {
             return "Current notification check could not finish. Your messages and contacts were not changed.";
         }
