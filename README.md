@@ -1,50 +1,32 @@
-# Who's Texting? — Android recovery
+# Who's Texting?
 
-**Reconstructed Android source is now committed** after the original source archive could not be recovered. This is a fresh implementation of the notification-detection milestone, not a byte-for-byte restoration.
+Android component for reviewing Google Messages notification senders. No SMS-app replacement.
 
-## Files
-- `app/src/main/AndroidManifest.xml` — launcher and notification-listener declaration
-- `app/src/main/java/com/tonyferlazzo/whostexting/MainActivity.java` — explicit permission explanation, Android settings shortcut, test status
-- `app/src/main/java/com/tonyferlazzo/whostexting/MessagesListener.java` — only Google Messages sender titles, no message bodies
-- `app/build.gradle` — Android app settings
-- `.github/workflows/android-build.yml` — debug APK compilation and artifact
+## Version 1.0.0
+- Monitoring starts automatically once notification access is granted, and its running/paused choice is retained locally.
+- Captured sender labels and available phone metadata appear on the main review screen.
+- Last 30 unique captured senders are kept locally, with Recent senders and explicit history erasure.
+- Contacts check identifies existing saved numbers when READ_CONTACTS is allowed.
+- Optional business lookup sends only the selected phone number, with explicit consent, to Wikidata and OpenStreetMap's Overpass API.
+- Exact-number public directory matches are **UNVERIFIED proposals**, with evidence and listed-website links. Multiple matches stay separate; missing matches and unavailable services never invent names.
+- User reviews a name and approves opening a contact draft. Android's Contacts editor owns the final Save and Google account choice. This app has no WRITE_CONTACTS permission.
+- Ignore this number persists locally; Manage ignored numbers restores it.
+- Main screen reports actual monitoring readiness. Diagnostics are separate.
+- Persistent launcher icon and one permanent release signing certificate.
 
-## Current status (October 14, 2026)
-- Source recreation: **DONE**
-- Source committed to this repository: **DONE**
-- Automated build: **configured, not yet verified**
-- Original package ID/signing certificate: **not recovered or verified**
-- Compatible signed upgrade APK: **NOT produced**
-- Pixel notification permission: **still blocked**
-- Real Google Messages SMS/RCS test: **not run**
+## Honest limits
+The app does not read historical SMS/RCS texts, recover dismissed notifications, guarantee business lookup coverage, identify shared short codes, or authenticate a sender from a phone listing. Numbers can be reassigned or spoofed. Real Google Messages notification metadata varies across versions. Named senders with no phone metadata are shown as supplied labels and cannot be saved as inferred numbers.
 
-**Do not install the debug build as an update to the existing app.** The package ID and signing certificate have not been confirmed against the original APK. Android requires matching package identity and compatible signing for an in-place upgrade.
+Wikidata and OpenStreetMap are community directories. Their public data can be incomplete, stale, or conflicting; lookup is an attempt, not a universal reverse-phone service. No paid API or embedded secret is used.
 
-## Security and limitations
-The prototype declares READ_CONTACTS and a notification listener. It does not declare Internet, SMS read, or contacts write permission. Android's notification listener access is broad, even though the code filters notifications by Google Messages package. No content from message bodies is intentionally inspected or stored. This reconstruction is only a detection test; business lookup, existing-message scanning, and saving contacts are not implemented.
+## Privacy
+Message bodies are never intentionally inspected or stored. No message text, contact list, or device location is transmitted. INTERNET is used only for consented directory lookups; Contacts access is read-only and optional. Sender history and ignore rules remain in private device settings; backup is disabled. Android notification-listener access is broad even though the application filters to Google Messages. No default SMS role is requested.
 
-## Original evidence
-- Prior milestone: `WhosTexting-Milestone1.md` in ChatGPT Library
-- Prior signed APK SHA-256: `b688a6652b575a6c7958b9c0a4c85f522a887ce6ff94f281b721ed5174412542`
-- Prior build: https://github.com/aferlazzo/HelpMe/actions/runs/38082512911
+Data attribution: Wikidata (CC0); © OpenStreetMap contributors (ODbL). Source links remain visible beside proposals.
 
-## Next verification gates
-1. Confirm the GitHub Actions build compiles successfully; fix any build errors.
-2. Recover package name and signing fingerprint from the installed APK or previous build artifacts.
-3. Build a properly signed update with the same identity, or explicitly choose a separate new installation.
-4. Address Android's restricted-settings notification-access policy through supported permission flows; never bypass protections or disable Play Protect globally.
-5. Test on the Pixel with real SMS and RCS notifications before adding identification and contact-saving features.
+## Builds and tests
+Release workflow validates the fixed signing fingerprint before publishing an APK. The private key is loaded from the encrypted WHOS_TEXTING_SIGNING_JSON repository secret and is never committed. Never distribute temporary debug APKs.
 
-## Clean Pixel installation — replacement build
+The notification integration workflow runs clean AOSP emulators (API 35 and 36). A clearly labeled, emulator-only fixture posts real Android notifications from a separate process. It uses the Messages package name solely to exercise the app's source filter and must never be installed on user phones. Tests cover callback delivery, flat and MessagingStyle sender labels, phone metadata, Contacts recognition, ignore/undo, snapshots, stop state, bounded persistence, directory mismatch/unknown/error cases, and contact-approval UI. A public-directory smoke test uses only the Library of Congress's published public number.
 
-The previous WT app never passed its Pixel notification-access test. Its local data and upgrade signature do **not** need to be preserved. The rebuilt app can be installed fresh.
-
-1. In GitHub Actions, open the most recent **successful** `Android recovery build` run.
-2. Under **Artifacts**, download `whosTexting-recovery-debug-DO-NOT-INSTALL-AS-UPDATE`. Unzip it to obtain `app-debug.apk`. This is a **debug test build**, not a production release.
-3. On the Pixel, uninstall the old **Who's Texting?** app through Android Settings > Apps. This deletes its local data.
-4. Transfer `app-debug.apk` to the Pixel and open it from Files. Review Android's per-source installation approval and any Play Protect warning. **Do not disable Play Protect globally.**
-5. Open WT. Select **Allow notification access**, then approve it in Android's notification-listener settings.
-6. If Android says the setting is restricted or the switch is disabled, open Android Settings > Apps > Who's Texting? > App info. On Android versions that provide it, the upper-right menu may contain **Allow restricted settings**. Only enable it if you trust this exact APK and understand that notification listeners have broad access. If that option is absent, stop and record the screen; do not bypass Android's protections.
-7. Return to WT. Start a fresh test. Receive a **new** Google Messages notification from an unfamiliar sender, then refresh WT. This version does not read historical texts.
-
-**Important:** A green GitHub build confirms compilation, not notification permission on the Pixel. A debug APK sideload may itself trigger restricted-settings controls. If it does, prefer a trusted distribution/install route rather than repeatedly reinstalling or changing unrelated settings.
+Emulator tests do not prove delivery from the real Google Messages app on Tony's physical Pixel. Report that distinction in every verification claim.

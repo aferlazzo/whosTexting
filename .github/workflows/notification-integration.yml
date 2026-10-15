@@ -44,9 +44,11 @@ jobs:
             adb install app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
             adb install notification-fixture/build/outputs/apk/debug/notification-fixture-debug.apk
             adb shell pm grant com.google.android.apps.messaging android.permission.POST_NOTIFICATIONS
+            adb shell pm grant com.google.android.apps.messaging android.permission.WRITE_CONTACTS
+            adb shell pm grant com.tonyferlazzo.whostexting android.permission.READ_CONTACTS
             adb shell cmd notification allow_listener com.tonyferlazzo.whostexting/com.tonyferlazzo.whostexting.MessagesListener
             adb shell am instrument -w -r com.tonyferlazzo.whostexting.test/androidx.test.runner.AndroidJUnitRunner | tee instrumentation-result.txt
-            grep -F "OK (1 test)" instrumentation-result.txt
+            grep -E "OK \\([0-9]+ tests?\\)" instrumentation-result.txt
       - name: Retain test evidence only
         if: always()
         uses: actions/upload-artifact@v4

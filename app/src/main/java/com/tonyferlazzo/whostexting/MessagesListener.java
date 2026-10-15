@@ -12,6 +12,7 @@ import android.service.notification.StatusBarNotification;
 public final class MessagesListener extends NotificationListenerService {
     public static volatile boolean connected = false;
     public static volatile String lastSender = "No sender captured";
+    public static volatile String lastNumber = "";
     public static volatile int count = 0;
     public static volatile boolean testing = false;
     public static volatile int allEvents = 0;
@@ -21,6 +22,7 @@ public final class MessagesListener extends NotificationListenerService {
     private static final String MESSAGES = "com.google.android.apps.messaging";
 
     static String numberKey(String sender) {
+        if (sender != null && sender.startsWith("tel:")) sender = sender.substring(4);
         if (sender == null || !sender.matches("[+0-9().\\s-]+")) return "";
         String number = PhoneNumberUtils.normalizeNumber(sender);
         if (!number.matches("\\+?[0-9]{3,15}")) return "";
@@ -53,13 +55,16 @@ public final class MessagesListener extends NotificationListenerService {
     @Override public void onCreate() {
         super.onCreate();
         testing = getSharedPreferences("sender_preferences", Context.MODE_PRIVATE)
-            .getBoolean("live_test_running", false);
+            .getBoolean("live_test_running", true);
+        java.util.List<SenderStore.Sender> history = SenderStore.read(this);
+        if (!history.isEmpty()) { lastSender = history.get(0).label; lastNumber = history.get(0).number; }
     }
 
     @Override public void onListenerConnected() {
         activeListener = this;
         connected = true;
         super.onListenerConnected();
+        if (testing) checkCurrentMessages();
     }
     @Override public void onListenerDisconnected() {
         connected = false;
@@ -73,7 +78,14 @@ public final class MessagesListener extends NotificationListenerService {
         googleEvents++;
         diagnostic = "Google Messages notification received";
         String sender = senderTitle(sbn.getNotification());
-        if (sender != null) captureSender(this, sender);
+        if (sender != null) {
+            String number = senderNumber(sbn.getNotification(), sender);
+            if (isIgnored(this, number)) { diagnostic = "Ignored sender skipped"; return; }
+            if (captureSender(this, sender)) {
+                lastNumber = number;
+                SenderStore.record(this, sender, number);
+            }
+        }
     }
 
     @Override public void onDestroy() {
@@ -95,10 +107,36 @@ public final class MessagesListener extends NotificationListenerService {
         if (title == null) { diagnostic = "Sender title missing"; return null; }
         String sender = title.toString().trim();
         // Only inspect sender labels. Never inspect, retain or transmit message bodies.
-        if (sender.isEmpty() || sender.length() > 100 || sender.contains(",") || sender.contains(" • ")) {
+        if (sender.isEmpty() || sender.length() > 160) {
             diagnostic = "Sender title filtered"; return null;
         }
         return sender;
+    }
+
+    private static String senderNumber(Notification notification, String title) {
+        String direct = numberKey(title);
+        if (!direct.isEmpty()) return direct;
+        if (notification == null || notification.extras == null) return "";
+        Bundle extras = notification.extras;
+        // Inspect sender metadata only, never the text members of message Bundles.
+        if (android.os.Build.VERSION.SDK_INT >= 28) {
+            android.os.Parcelable[] messages = extras.getParcelableArray("android.messages");
+            if (messages != null && messages.length > 0 && messages[messages.length - 1] instanceof Bundle) {
+                Bundle last = (Bundle)messages[messages.length - 1];
+                android.os.Parcelable value = last.getParcelable("sender_person");
+                if (value instanceof android.app.Person) {
+                    String phone = numberKey(((android.app.Person)value).getUri());
+                    if (!phone.isEmpty()) return phone;
+                }
+            }
+            java.util.ArrayList<android.app.Person> people = extras.getParcelableArrayList("android.people.list");
+            if (people != null && people.size() == 1) {
+                String phone = numberKey(people.get(0).getUri());
+                if (!phone.isEmpty()) return phone;
+            }
+        }
+        String[] people = extras.getStringArray("android.people");
+        return people != null && people.length == 1 ? numberKey(people[0]) : "";
     }
 
     static String checkCurrentMessages() {
@@ -116,9 +154,13 @@ public final class MessagesListener extends NotificationListenerService {
                 if (!MESSAGES.equals(notification.getPackageName())) continue;
                 messages++;
                 String sender = senderTitle(notification.getNotification());
-                if (sender == null || isIgnored(listener, sender)) continue;
+                if (sender == null) continue;
+                String number = senderNumber(notification.getNotification(), sender);
+                if (isIgnored(listener, sender) || isIgnored(listener, number)) continue;
                 // A snapshot is separate from live event counters.
                 lastSender = sender;
+                lastNumber = number;
+                SenderStore.record(listener, sender, number);
                 diagnostic = "Sender found in a current Google Messages notification";
                 return "Current Google Messages sender: " + sender
                     + "\n\nThis is a notification already showing on your phone, not a newly received text.";
@@ -147,3 +189,4 @@ public final class MessagesListener extends NotificationListenerService {
         return true;
     }
 }
+

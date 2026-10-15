@@ -7,8 +7,8 @@ android {
         minSdk 26
         targetSdk 35
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
-        versionCode 7
-        versionName '0.3.3-current-notifications'
+        versionCode 8
+        versionName '1.0.0'
     }
     signingConfigs {
         release {
@@ -36,4 +36,6 @@ android {
 dependencies {
     androidTestImplementation 'androidx.test:runner:1.6.2'
     androidTestImplementation 'junit:junit:4.13.2'
+    androidTestImplementation 'androidx.test:core:1.6.1'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.6.1'
 }

@@ -39,6 +39,7 @@ public final class NotificationDeliveryTest {
         MessagesListener.count = 0;
         MessagesListener.googleEvents = 0;
         MessagesListener.lastSender = "No sender captured";
+        SenderStore.clear(context);
         try {
             // Post from a separate installed fixture process. Do not call the listener directly.
             post(flat, false);
@@ -68,6 +69,22 @@ public final class NotificationDeliveryTest {
             await("Conversation notification title captured",
                 () -> conversation.equals(MessagesListener.lastSender));
 
+            // Phone metadata survives when Messages shows a contact name instead of digits.
+            Intent known = new Intent();
+            known.setComponent(new ComponentName("com.google.android.apps.messaging",
+                "com.tonyferlazzo.whostexting.fixture.SenderActivity"));
+            known.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            known.putExtra("sender", "WT Known Contact");
+            known.putExtra("phone", "+12025550198");
+            known.putExtra("messaging_style", true);
+            known.putExtra("seed_contact", true);
+            context.startActivity(known);
+            await("Known sender phone metadata captured", () ->
+                "+12025550198".equals(MessagesListener.lastNumber));
+            assertEquals("WT Known Contact", ContactActions.existingName(context, "+12025550198"));
+            assertTrue(SenderStore.read(context).stream().anyMatch(row ->
+                row.number.equals("+12025550198") && row.label.equals("WT Known Contact")));
+
             // Running state is retained in private settings rather than only RAM.
             assertTrue(context.getSharedPreferences("sender_preferences", Context.MODE_PRIVATE)
                 .getBoolean("live_test_running", false));
@@ -81,6 +98,7 @@ public final class NotificationDeliveryTest {
         } finally {
             MessagesListener.setIgnored(context, key, false);
             MessagesListener.setTesting(context, false);
+            SenderStore.clear(context);
         }
     }
 }
