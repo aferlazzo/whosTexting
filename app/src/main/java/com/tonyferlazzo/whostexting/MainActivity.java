@@ -24,7 +24,11 @@ import java.util.concurrent.Executors;
 public final class MainActivity extends Activity {
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
-    private TextView monitor, senderText, identityText, lookupText;
+    private TextView monitor, readiness, testStatus, senderText, identityText, lookupText;
+    private Button contactsButton, alertsButton;
+    private LinearLayout advanced;
+    private boolean contactCheckFailed;
+    private long lastPresentedTime;
     private Button accessButton, lookupButton, saveButton, ignoreButton, sourceButton, websiteButton, pauseButton, autoButton;
     private EditText nameInput;
     private SenderStore.Sender selected;
@@ -51,15 +55,24 @@ public final class MainActivity extends Activity {
         catch (Exception ignored) { }
         TextView heading = text(root, "Who's Texting? " + version); heading.setTextSize(24);
         monitor = text(root, "Checking notification access…");
-        button(root, "Test sample message", this::testSampleMessage);
+        readiness = text(root, "Checking identification setup…");
+        button(root, "Test unknown sender", this::testUnknownSender);
+        testStatus = text(root, "No workflow test run yet.");
+        alertsButton = button(root, "Enable alerts", this::enableAlerts);
         accessButton = button(root, "Enable notification access", this::enableAccess);
-        senderText = text(root, "No sender captured yet."); senderText.setTextSize(22);
-        identityText = text(root, "");
-        button(root, "Check Contacts", () -> {
+        contactsButton = button(root, "Allow Contacts check", () -> {
             if (!ContactActions.canRead(this)) requestPermissions(new String[]{Manifest.permission.READ_CONTACTS}, 10);
             else updateContact();
         });
-        autoButton = button(root, "Directory fallback: Off", this::toggleAutomatic);
+        button(root, "Check current notifications", () -> {
+            String result = MessagesListener.checkCurrentMessages();
+            refresh();
+            new AlertDialog.Builder(this).setTitle("Current notifications")
+                .setMessage(result).setPositiveButton("Done", null).show();
+        });
+        button(root, "Recent senders", this::showRecent);
+        senderText = text(root, "No sender captured yet."); senderText.setTextSize(22);
+        identityText = text(root, "");
         lookupButton = button(root, "Look up business", this::askLookup);
         lookupText = text(root, "Business lookup is optional. No contact is saved automatically.");
         sourceButton = button(root, "View directory evidence", () -> openWeb(proposal == null ? "" : proposal.evidence));
@@ -71,12 +84,16 @@ public final class MainActivity extends Activity {
         root.addView(nameInput);
         saveButton = button(root, "Review and save contact", this::reviewSave);
         ignoreButton = button(root, "Ignore this number", this::ignore);
-        button(root, "Recent senders", this::showRecent);
-        button(root, "Manage ignored numbers", this::manageIgnored);
-        pauseButton = button(root, "Pause monitoring", () -> {
+        button(root, "Settings and privacy", () -> advanced.setVisibility(
+            advanced.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE));
+        advanced = new LinearLayout(this); advanced.setOrientation(LinearLayout.VERTICAL);
+        root.addView(advanced); advanced.setVisibility(View.GONE);
+        autoButton = button(advanced, "Directory fallback: Off", this::toggleAutomatic);
+        button(advanced, "Manage ignored numbers", this::manageIgnored);
+        pauseButton = button(advanced, "Pause monitoring", () -> {
             MessagesListener.setTesting(this, !MessagesListener.testing); refresh();
         });
-        button(root, "Diagnostics and privacy", this::showDiagnostics);
+        button(advanced, "Diagnostics and privacy", this::showDiagnostics);
         text(root, "© Anthony Ferlazzo, 2026").setTextSize(12);
         ScrollView scroll = new ScrollView(this); scroll.setBackgroundColor(android.graphics.Color.WHITE);
         scroll.addView(root); setContentView(scroll);
@@ -104,6 +121,10 @@ public final class MainActivity extends Activity {
         super.onResume();
         if (hasAccess() && MessagesListener.connected && MessagesListener.testing) MessagesListener.checkCurrentMessages();
         handler.removeCallbacks(updater); updater.run(); updateContact();
+        if (getIntent().getBooleanExtra("show_workflow_test", false)) {
+            getIntent().removeExtra("show_workflow_test");
+            showWorkflowTestResult();
+        }
         String requested = getIntent().getStringExtra("selected_number");
         if (requested != null) {
             for (SenderStore.Sender row : SenderStore.read(this)) {
@@ -116,7 +137,7 @@ public final class MainActivity extends Activity {
     @Override protected void onDestroy() { handler.removeCallbacks(updater); worker.shutdownNow(); super.onDestroy(); }
     @Override public void onRequestPermissionsResult(int code, String[] permissions, int[] results) {
         super.onRequestPermissionsResult(code, permissions, results);
-        if (code == 10 && AutoIdentify.enabled(this) && ContactActions.canRead(this)
+        if (code == 10 && ContactActions.canRead(this)
                 && android.os.Build.VERSION.SDK_INT >= 33
                 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
                     != android.content.pm.PackageManager.PERMISSION_GRANTED)
@@ -130,7 +151,21 @@ public final class MainActivity extends Activity {
             : !MessagesListener.connected ? "Permission allowed — waiting for Android to connect."
             : MessagesListener.testing ? "Monitoring on — you can leave this screen."
             : "Monitoring paused.");
+        boolean contacts = ContactActions.canRead(this);
+        boolean liveAlerts = AutoIdentify.alertsEnabled(this, AutoIdentify.CHANNEL);
+        boolean testAlerts = AutoIdentify.alertsEnabled(this, AutoIdentify.TEST_CHANNEL);
+        readiness.setText(!contacts ? "Identification needs permission to check Contacts."
+            : !liveAlerts ? "Identification alerts are blocked. Enable alerts below."
+            : "Message identification is ready" + (allowed && MessagesListener.connected && MessagesListener.testing
+                ? " for incoming notifications." : "; monitoring must be on to receive new texts."));
+        contactsButton.setVisibility(contacts ? View.GONE : View.VISIBLE);
+        alertsButton.setVisibility(liveAlerts && testAlerts ? View.GONE : View.VISIBLE);
         accessButton.setVisibility(allowed ? View.GONE : View.VISIBLE);
+        android.content.SharedPreferences test = getSharedPreferences("workflow_test", 0);
+        testStatus.setText(test.getLong("time", 0) == 0 ? "No workflow test run yet. Tap Test unknown sender."
+            : "Last test: " + test.getString("summary", "Not run") + "\n"
+                + android.text.format.DateFormat.format("MMM d, h:mm a", test.getLong("time", 0)));
+        testStatus.setTextSize(14);
         pauseButton.setText(MessagesListener.testing ? "Pause monitoring" : "Resume monitoring");
         autoButton.setText(!AutoIdentify.enabled(this) ? "Directory fallback: Off"
             : !ContactActions.canRead(this) ? "Directory fallback: Needs Contacts permission"
@@ -140,10 +175,17 @@ public final class MainActivity extends Activity {
         if (!busy && nameInput.getText().toString().trim().isEmpty() && proposal == null) {
             for (SenderStore.Sender candidate : recent) {
                 if (!MessagesListener.isIgnored(this, candidate.number)) {
-                    if (selected == null) select(candidate);
+                    if (selected == null || candidate.time > lastPresentedTime || (selected.id.equals(candidate.id)
+                            && (candidate.time != selected.time || !candidate.clues.equals(selected.clues)))) select(candidate);
+                    lastPresentedTime = Math.max(lastPresentedTime, candidate.time);
                     break;
                 }
             }
+        }
+        if (!recent.isEmpty()) {
+            SenderStore.Sender latest = recent.get(0);
+            readiness.append("\nLast captured: " + latest.label + " · "
+                + android.text.format.DateFormat.format("MMM d, h:mm a", latest.time));
         }
         updateButtons();
     }
@@ -153,25 +195,32 @@ public final class MainActivity extends Activity {
             ? "" : "\n" + sender.number));
         lookupText.setText(!sender.clues.isEmpty() ? sender.clues : sender.number.isEmpty()
             ? "Google Messages did not supply a phone number for this sender. Business lookup requires a number."
-            : "No business identity checked yet. Lookup results are proposals, not verified senders.");
+            : "No usable message clues available. An optional directory lookup can try the number; results are unverified.");
         updateContact(); updateButtons();
     }
     private void updateContact() {
         if (selected == null || identityText == null) return;
-        knownName = "";
+        knownName = ""; contactCheckFailed = false;
         try { knownName = ContactActions.existingName(this, selected.number); }
-        catch (RuntimeException error) { identityText.setText("Contacts check unavailable."); return; }
+        catch (RuntimeException error) { contactCheckFailed = true; identityText.setText("Contacts check unavailable. Identification paused for this sender."); updateButtons(); return; }
         identityText.setText(!knownName.isEmpty() ? "Already in Contacts: " + knownName
             : selected.number.isEmpty() ? "Google Messages supplied this label, but no phone number. No identity inferred."
             : ContactActions.canRead(this) ? "Not found in Contacts."
             : "Contacts haven't been checked. Check Contacts to allow a local lookup.");
+        if (!knownName.isEmpty()) lookupText.setText("Known contact. Message analysis and automatic external lookup skipped.");
+        else if (!ContactActions.canRead(this)) lookupText.setText("Allow Contacts check above to identify unfamiliar senders safely.");
         updateButtons();
     }
     private void updateButtons() {
         if (lookupButton == null || nameInput == null) return;
         boolean hasNumber = selected != null && !selected.number.isEmpty();
         boolean ignored = hasNumber && MessagesListener.isIgnored(this, selected.number);
-        lookupButton.setEnabled(hasNumber && knownName.isEmpty() && !ignored && !busy);
+        boolean eligible = hasNumber && knownName.isEmpty() && !ignored && ContactActions.canRead(this) && !contactCheckFailed;
+        lookupButton.setVisibility(eligible ? View.VISIBLE : View.GONE);
+        saveButton.setVisibility(eligible ? View.VISIBLE : View.GONE);
+        nameInput.setVisibility(eligible ? View.VISIBLE : View.GONE);
+        ignoreButton.setVisibility(hasNumber ? View.VISIBLE : View.GONE);
+        lookupButton.setEnabled(eligible && !busy);
         saveButton.setEnabled(hasNumber && knownName.isEmpty() && !ignored && !busy);
         ignoreButton.setEnabled(hasNumber && !ignored && !busy);
         nameInput.setEnabled(hasNumber && knownName.isEmpty() && !ignored && !busy);
@@ -295,25 +344,41 @@ public final class MainActivity extends Activity {
         try { startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url))); }
         catch (RuntimeException error) { lookupText.setText("No browser is available to open the evidence."); }
     }
-    private void testSampleMessage() {
-        String sample = "Your Walgreens prescription is ready for pickup.";
-        String result = MessageClues.analyze(sample);
-        boolean pharmacy = result.contains("Walgreens") && result.contains("Prescription")
-            && result.contains("not verified");
-        String delivery = MessageClues.analyze("Your FedEx package arrives today.");
-        boolean shipment = delivery.contains("FedEx") && delivery.contains("Delivery")
-            && delivery.contains("not verified");
-        boolean unknown = MessageClues.analyze("See you tomorrow.").isEmpty();
-        String code = MessageClues.analyze("Your verification code is 123456.");
-        boolean privateCode = code.contains("Verification") && !code.contains("123456");
-        int passed = (pharmacy ? 1 : 0) + (shipment ? 1 : 0) + (unknown ? 1 : 0) + (privateCode ? 1 : 0);
+    private void testUnknownSender() {
+        WorkflowSelfTest.run(this);
+        refresh();
+        showWorkflowTestResult();
+    }
+    private void showWorkflowTestResult() {
+        android.content.SharedPreferences test = getSharedPreferences("workflow_test", 0);
         new AlertDialog.Builder(this)
-            .setTitle(passed == 4 ? "Sample test passed" : "Sample test needs attention")
-            .setMessage("DEMO — fictional text, not a received message.\n\nSample:\n" + sample
-                + "\n\nWT result:\n" + (result.isEmpty() ? "No useful clue found." : result)
-                + "\n\n" + passed + "/4 checks passed: pharmacy, delivery, unknown text, and keeping verification codes out of results."
-                + "\n\nThis tests local message analysis. It does not test delivery from Google Messages. No internet lookup, contact changes, or saved sample history.")
-            .setPositiveButton("Done", null).show();
+            .setTitle(test.getString("summary", "").startsWith("Workflow test passed")
+                ? "Workflow test passed" : "Workflow test needs attention")
+            .setMessage(test.getString("detail", "Tap Test unknown sender on the main screen."))
+            .setPositiveButton("Done", null)
+            .setNeutralButton("Run again", (dialog, which) -> testUnknownSender()).show();
+    }
+    private void enableAlerts() {
+        if (android.os.Build.VERSION.SDK_INT >= 33
+                && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
+                    != android.content.pm.PackageManager.PERMISSION_GRANTED
+                && (!getSharedPreferences("sender_preferences", 0).getBoolean("alert_permission_asked", false)
+                    || shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS))) {
+            getSharedPreferences("sender_preferences", 0).edit().putBoolean("alert_permission_asked", true).apply();
+            requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 11);
+            return;
+        }
+        android.app.NotificationManager manager = getSystemService(android.app.NotificationManager.class);
+        String channel = !AutoIdentify.alertsEnabled(this, AutoIdentify.CHANNEL)
+            ? AutoIdentify.CHANNEL : AutoIdentify.TEST_CHANNEL;
+        Intent settings = new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+            .putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName());
+        if (manager != null && manager.areNotificationsEnabled() && manager.getNotificationChannel(channel) != null) {
+            settings = new Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
+                .putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName())
+                .putExtra(Settings.EXTRA_CHANNEL_ID, channel);
+        }
+        startActivity(settings);
     }
 
     private void showDiagnostics() {

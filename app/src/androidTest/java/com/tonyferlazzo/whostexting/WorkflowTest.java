@@ -76,27 +76,36 @@ public final class WorkflowTest {
         } finally { SenderStore.clear(context); }
     }
 
-    @Test public void sampleButtonRunsRealAnalysisWithoutChangingHistoryOrConsent() {
+    @Test public void unknownSenderButtonExercisesWorkflowAndRealAlertWithoutChangingHistoryOrConsent() {
         String before = context.getSharedPreferences("captured_senders", 0).getString("recent", "[]");
         boolean consent = AutoIdentify.enabled(context);
         boolean monitoring = MessagesListener.testing;
         MessagesListener.setTesting(context, false);
         try (ActivityScenario<MainActivity> activity = ActivityScenario.launch(MainActivity.class)) {
-            onView(withText("Test sample message")).check(matches(isDisplayed())).perform(click());
-            onView(withText("Sample test passed")).check(matches(isDisplayed()));
-            onView(withText(org.hamcrest.Matchers.containsString("4/4 checks passed"))).check(matches(isDisplayed()));
-            onView(withText(org.hamcrest.Matchers.containsString("Mentioned sender: Walgreens"))).check(matches(isDisplayed()));
-            captureScreen("sample-test-result.png");
+            onView(withText("Test unknown sender")).check(matches(isDisplayed())).perform(click());
+            onView(withText("Workflow test passed")).check(matches(isDisplayed()));
+            onView(withText(org.hamcrest.Matchers.containsString("PASS: sender extraction"))).check(matches(isDisplayed()));
+            onView(withText(org.hamcrest.Matchers.containsString("Mentioned sender: Desert Dental"))).check(matches(isDisplayed()));
+            android.app.NotificationManager manager = context.getSystemService(android.app.NotificationManager.class);
+            long deadline = android.os.SystemClock.elapsedRealtime() + 5000;
+            while (java.util.Arrays.stream(manager.getActiveNotifications()).noneMatch(n -> n.getId() == AutoIdentify.TEST_ID)
+                    && android.os.SystemClock.elapsedRealtime() < deadline) android.os.SystemClock.sleep(50);
+            assertTrue(java.util.Arrays.stream(manager.getActiveNotifications()).anyMatch(n -> n.getId() == AutoIdentify.TEST_ID
+                && "WT TEST — simulated unknown sender".contentEquals(n.getNotification().extras.getCharSequence(android.app.Notification.EXTRA_TITLE))));
+            captureScreen("workflow-test-result.png");
             onView(withText("Done")).perform(click());
             assertEquals(before, context.getSharedPreferences("captured_senders", 0).getString("recent", "[]"));
             assertEquals(consent, AutoIdentify.enabled(context));
             assertFalse(MessagesListener.testing);
             // Running it twice must not accumulate sample senders or change monitoring.
-            onView(withText("Test sample message")).perform(click());
-            onView(withText("Sample test passed")).check(matches(isDisplayed()));
+            onView(withText("Test unknown sender")).perform(click());
+            onView(withText("Workflow test passed")).check(matches(isDisplayed()));
             onView(withText("Done")).perform(click());
             assertEquals(before, context.getSharedPreferences("captured_senders", 0).getString("recent", "[]"));
-        } finally { MessagesListener.setTesting(context, monitoring); }
+        } finally {
+            MessagesListener.setTesting(context, monitoring);
+            context.getSystemService(android.app.NotificationManager.class).cancel(AutoIdentify.TEST_ID);
+        }
     }
 
     private void captureScreen(String name) {

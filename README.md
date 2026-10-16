@@ -2,7 +2,16 @@
 
 Android component for reviewing Google Messages notification senders. No SMS-app replacement.
 
-## Version 1.0.5
+## Version 1.0.6
+- Test unknown sender uses the same sender parser and processing path as live notifications, with fictional input, simulated unknown Contacts, isolated history and no external lookup.
+- The test submits a clearly labeled WT TEST alert through the same Android notification builder/post code used by live alerts. Missing permission or blocked test channels are reported, not treated as successful alert delivery.
+- Test results persist separately from real sender history. No test edits Contacts, replaces Google Messages, sends an SMS, or changes monitoring.
+- Main screen separates monitoring, identification permissions, latest real capture, and the last simulated test. Contacts and alert setup actions appear only when needed.
+- Current-notification check and Recent senders are prominent. Optional directory lookup, pause, ignored numbers, and diagnostics sit under Settings and privacy.
+- Known-contact and missing/failed Contacts queries cannot proceed to body analysis or automatic lookup. Rechecking an unchanged notification does not repeatedly alert.
+- API 35/36 tests exercise the shared workflow, known/unknown/ignored/permission-failure branches, real test alert submission, and UI repeatability with unchanged real history/settings.
+
+## Previous version 1.0.5
 - A visible Test sample message button runs the real local analyzer immediately, without waiting for a text or typing.
 - A labeled fictional sample shows the extracted result and four pass/fail checks. It does not change history, Contacts, external-lookup consent, or monitoring.
 - The result explicitly distinguishes local analysis from Google Messages notification delivery.
@@ -50,3 +59,11 @@ Release workflow validates the fixed signing fingerprint before publishing an AP
 The notification integration workflow runs clean AOSP emulators (API 35 and 36). A clearly labeled, emulator-only fixture posts real Android notifications from a separate process. It uses the Messages package name solely to exercise the app's source filter and must never be installed on user phones. Tests cover callback delivery, flat and MessagingStyle sender labels, phone metadata, Contacts recognition, ignore/undo, snapshots, stop state, bounded persistence, directory mismatch/unknown/error cases, and contact-approval UI. A public-directory smoke test uses only the Library of Congress's published public number.
 
 Emulator tests do not prove delivery from the real Google Messages app on Tony's physical Pixel. Report that distinction in every verification claim.
+
+## Development and acceptance rules
+- Run the automated notification and UI suites before publishing a signed update. Preserve the permanent certificate.
+- Give the user one installation route: the public GitHub release page and its APK asset. Do not replace that route with experimental file URLs.
+- Distinguish compiled, emulator-tested, installed, simulated-on-device-tested, and real-Google-Messages-captured. Never turn one into a claim of the others.
+- On-device tests must need no helper, contact edits, fictional contact saves, or waiting for strangers. Label simulated inputs, mock boundaries and remaining limits.
+- Keep normal monitoring and the last real capture visible. Show the next missing permission directly, and keep diagnostics out of routine use.
+- Physical Pixel checks reported by Tony: 1.0.5 installed, local sample analysis passed, and Fran's real incoming notification appeared in Recent senders. Real unknown-sender Google Messages delivery has not been independently observed.

@@ -16,7 +16,9 @@ import java.util.concurrent.Executors;
 
 /** Optional, consented lookup of new unknown numbers. Message clues are derived locally; only numbers reach directories. */
 final class AutoIdentify {
-    private static final String CHANNEL = "sender_identity";
+    static final String CHANNEL = "sender_identity";
+    static final String TEST_CHANNEL = "sender_identity_test";
+    static final int TEST_ID = -1048606;
     private static final ExecutorService EXECUTOR = Executors.newSingleThreadExecutor();
     private static final Set<String> IN_FLIGHT = new HashSet<>();
     private AutoIdentify() {}
@@ -106,23 +108,46 @@ final class AutoIdentify {
         if (!ContactActions.canRead(context) || MessagesListener.isIgnored(context, number)) return;
         try { if (!ContactActions.existingName(context, number).isEmpty()) return; }
         catch (RuntimeException unavailable) { return; }
-        NotificationManager manager = context.getSystemService(NotificationManager.class);
-        if (manager == null) return;
-        if (Build.VERSION.SDK_INT >= 33 &&
-                context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
-                    != PackageManager.PERMISSION_GRANTED) return;
-        manager.createNotificationChannel(new NotificationChannel(CHANNEL,
-            "Unknown sender identification", NotificationManager.IMPORTANCE_DEFAULT));
         Intent open = new Intent(context, MainActivity.class);
         open.putExtra("selected_number", number);
         open.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-        PendingIntent intent = PendingIntent.getActivity(context, number.hashCode(), open,
+        post(context, CHANNEL, number.hashCode(), title, detail, open);
+    }
+
+    static boolean alertsEnabled(Context context, String channel) {
+        NotificationManager manager = context.getSystemService(NotificationManager.class);
+        if (manager == null || !manager.areNotificationsEnabled()) return false;
+        if (Build.VERSION.SDK_INT >= 33 && context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED) return false;
+        NotificationChannel existing = manager.getNotificationChannel(channel);
+        return existing == null || existing.getImportance() != NotificationManager.IMPORTANCE_NONE;
+    }
+
+    static boolean showTest(Context context, String number, String clues) {
+        Intent open = new Intent(context, MainActivity.class);
+        open.putExtra("show_workflow_test", true);
+        open.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        return post(context, TEST_CHANNEL, TEST_ID, "WT TEST — simulated unknown sender",
+            "FICTIONAL TEST " + number + " · " + clues, open);
+    }
+
+    private static boolean post(Context context, String channel, int id, String title, String detail, Intent open) {
+        if (!alertsEnabled(context, channel)) return false;
+        NotificationManager manager = context.getSystemService(NotificationManager.class);
+        if (manager == null) return false;
+        manager.createNotificationChannel(new NotificationChannel(channel,
+            channel.equals(TEST_CHANNEL) ? "Workflow test alerts" : "Unknown sender identification",
+            NotificationManager.IMPORTANCE_DEFAULT));
+        PendingIntent intent = PendingIntent.getActivity(context, id, open,
             PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-        Notification notification = new Notification.Builder(context, CHANNEL)
+        Notification notification = new Notification.Builder(context, channel)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentTitle(title).setContentText(detail)
             .setStyle(new Notification.BigTextStyle().bigText(detail))
             .setContentIntent(intent).setAutoCancel(true).build();
-        manager.notify(number.hashCode(), notification);
+        try {
+            manager.notify(id, notification);
+            return true; // Android accepted the post; visibility is subject to system settings and DND.
+        } catch (RuntimeException blocked) { return false; }
     }
 }

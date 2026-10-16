@@ -77,14 +77,10 @@ public final class MessagesListener extends NotificationListenerService {
         if (!MESSAGES.equals(sbn.getPackageName())) return;
         googleEvents++;
         diagnostic = "Google Messages notification received";
-        for (SenderStore.Sender row : notificationSenders(sbn.getNotification())) {
-            if (isIgnored(this, row.number)) { diagnostic = "Ignored sender skipped"; continue; }
-            if (captureSender(this, row.label)) {
-                lastNumber = row.number;
-                String clues = messageClues(this, sbn.getNotification(), row.number);
-                SenderStore.record(this, row.label, row.number, sbn.getPostTime(), clues);
-                AutoIdentify.submitWithClues(this, row.number, clues);
-            }
+        for (SenderWorkflow.Outcome outcome : SenderWorkflow.live(this, sbn.getNotification(), sbn.getPostTime())) {
+            captureSender(this, outcome.sender.label);
+            lastNumber = outcome.sender.number;
+            diagnostic = outcome.status;
         }
     }
 
@@ -198,6 +194,10 @@ public final class MessagesListener extends NotificationListenerService {
         if (number.isEmpty() || !ContactActions.canRead(context) || isIgnored(context, number)) return "";
         try { if (!ContactActions.existingName(context, number).isEmpty()) return ""; }
         catch (RuntimeException unavailable) { return ""; }
+        return notificationClues(notification, number);
+    }
+
+    static String notificationClues(Notification notification, String number) {
         if (notification == null || notification.extras == null) return "";
         Bundle extras = notification.extras;
         android.os.Parcelable[] messages = extras.getParcelableArray("android.messages");
@@ -241,14 +241,10 @@ public final class MessagesListener extends NotificationListenerService {
             for (StatusBarNotification notification : notifications) {
                 if (!MESSAGES.equals(notification.getPackageName())) continue;
                 messages++;
-                for (SenderStore.Sender row : notificationSenders(notification.getNotification())) {
-                    if (isIgnored(listener, row.label) || isIgnored(listener, row.number)) continue;
-                    // A snapshot is separate from live event counters.
+                for (SenderWorkflow.Outcome outcome : SenderWorkflow.live(listener, notification.getNotification(), notification.getPostTime())) {
+                    SenderStore.Sender row = outcome.sender;
                     lastSender = row.label;
                     lastNumber = row.number;
-                    String clues = messageClues(listener, notification.getNotification(), row.number);
-                    SenderStore.record(listener, row.label, row.number, notification.getPostTime(), clues);
-                    AutoIdentify.submitWithClues(listener, row.number, clues);
                     recovered.add(row.id);
                 }
             }

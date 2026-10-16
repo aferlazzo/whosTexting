@@ -49,5 +49,5 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cp app/build/outputs/apk/release/app-release.apk whostexting-1.0.5.apk
-          gh release create v1.0.5 whostexting-1.0.5.apk certificate-verification.txt --target "$GITHUB_SHA" --title "Who's Texting? 1.0.5" --notes "Adds an on-phone sample-message test with honest results and no changes to history or Contacts. API 35 and 36 emulator tests passed before publication. Uses the existing permanent signing certificate. Physical Pixel delivery is not verified by these emulator tests."
+          cp app/build/outputs/apk/release/app-release.apk whostexting-1.0.6.apk
+          gh release create v1.0.6 whostexting-1.0.6.apk certificate-verification.txt --target "$GITHUB_SHA" --title "Who's Texting? 1.0.6" --notes "Shared unknown-sender workflow test, labeled real Android test alert, clearer permission status, and simplified main screen. Simulated contacts and isolated test history; no external lookup during tests. API 35 and 36 emulator tests passed before publication. Uses the existing permanent signing certificate. Physical Pixel delivery is not verified by these emulator tests."
