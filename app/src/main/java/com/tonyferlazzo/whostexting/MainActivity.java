@@ -25,7 +25,7 @@ public final class MainActivity extends Activity {
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private TextView monitor, senderText, identityText, lookupText;
-    private Button accessButton, lookupButton, saveButton, ignoreButton, sourceButton, websiteButton, pauseButton;
+    private Button accessButton, lookupButton, saveButton, ignoreButton, sourceButton, websiteButton, pauseButton, autoButton;
     private EditText nameInput;
     private SenderStore.Sender selected;
     private BusinessLookup.Match proposal;
@@ -58,6 +58,7 @@ public final class MainActivity extends Activity {
             if (!ContactActions.canRead(this)) requestPermissions(new String[]{Manifest.permission.READ_CONTACTS}, 10);
             else updateContact();
         });
+        autoButton = button(root, "Automatic identification: Off", this::toggleAutomatic);
         lookupButton = button(root, "Look up business", this::askLookup);
         lookupText = text(root, "Business lookup is optional. No contact is saved automatically.");
         sourceButton = button(root, "View directory evidence", () -> openWeb(proposal == null ? "" : proposal.evidence));
@@ -102,6 +103,13 @@ public final class MainActivity extends Activity {
         super.onResume();
         if (hasAccess() && MessagesListener.connected && MessagesListener.testing) MessagesListener.checkCurrentMessages();
         handler.removeCallbacks(updater); updater.run(); updateContact();
+        String requested = getIntent().getStringExtra("selected_number");
+        if (requested != null) {
+            for (SenderStore.Sender row : SenderStore.read(this)) {
+                if (requested.equals(row.number)) { select(row); break; }
+            }
+            getIntent().removeExtra("selected_number");
+        }
     }
     @Override protected void onPause() { handler.removeCallbacks(updater); super.onPause(); }
     @Override protected void onDestroy() { handler.removeCallbacks(updater); worker.shutdownNow(); super.onDestroy(); }
@@ -117,6 +125,7 @@ public final class MainActivity extends Activity {
             : "Monitoring paused.");
         accessButton.setVisibility(allowed ? View.GONE : View.VISIBLE);
         pauseButton.setText(MessagesListener.testing ? "Pause monitoring" : "Resume monitoring");
+        autoButton.setText(AutoIdentify.enabled(this) ? "Automatic identification: On" : "Automatic identification: Off");
         List<SenderStore.Sender> recent = SenderStore.read(this);
         if (!busy && nameInput.getText().toString().trim().isEmpty() && proposal == null) {
             for (SenderStore.Sender candidate : recent) {
@@ -158,6 +167,27 @@ public final class MainActivity extends Activity {
         nameInput.setEnabled(hasNumber && knownName.isEmpty() && !ignored && !busy);
         sourceButton.setVisibility(proposal == null ? View.GONE : View.VISIBLE);
         websiteButton.setVisibility(proposal == null || proposal.website.isEmpty() ? View.GONE : View.VISIBLE);
+    }
+    private void toggleAutomatic() {
+        if (AutoIdentify.enabled(this)) {
+            getSharedPreferences("sender_preferences", MODE_PRIVATE).edit()
+                .putBoolean("auto_lookup_consent", false).apply();
+            refresh();
+            return;
+        }
+        new AlertDialog.Builder(this).setTitle("Enable automatic sender identification?")
+            .setMessage("For each new unfamiliar sender with a usable phone number, Who's Texting? may send only that number to Wikidata and OpenStreetMap to search public business listings. Message contents and your contact list are never sent. Listings are unverified and may be missing or incorrect. You can turn this off here at any time.")
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton("Enable", (dialog, which) -> {
+                getSharedPreferences("sender_preferences", MODE_PRIVATE).edit()
+                    .putBoolean("auto_lookup_consent", true).apply();
+                if (android.os.Build.VERSION.SDK_INT >= 33
+                    && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
+                        != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                    requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 11);
+                }
+                refresh();
+            }).show();
     }
     private void enableAccess() {
         new AlertDialog.Builder(this).setTitle("Allow sender detection")
