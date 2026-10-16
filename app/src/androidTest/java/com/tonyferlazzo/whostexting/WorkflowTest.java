@@ -66,7 +66,7 @@ public final class WorkflowTest {
         SenderStore.record(context, phone, phone);
         try (ActivityScenario<MainActivity> activity = ActivityScenario.launch(MainActivity.class)) {
             captureScreen("review-screen.png");
-            onView(withContentDescription("Name you approve for this number")).perform(replaceText("Approved sample"), closeSoftKeyboard());
+            onView(withContentDescription("Name you approve for this number")).perform(scrollTo(), replaceText("Approved sample"), closeSoftKeyboard());
             onView(withText("Review and save contact")).perform(scrollTo(), click());
             onView(withText("Approve this contact draft?")).check(matches(isDisplayed()));
             captureScreen("approval-screen.png");
@@ -82,6 +82,7 @@ public final class WorkflowTest {
         boolean monitoring = MessagesListener.testing;
         MessagesListener.setTesting(context, false);
         try (ActivityScenario<MainActivity> activity = ActivityScenario.launch(MainActivity.class)) {
+            captureScreen("main-screen.png");
             onView(withText("Test unknown sender")).check(matches(isDisplayed())).perform(click());
             onView(withText("Workflow test passed")).check(matches(isDisplayed()));
             onView(withText(org.hamcrest.Matchers.containsString("PASS: sender extraction"))).check(matches(isDisplayed()));
