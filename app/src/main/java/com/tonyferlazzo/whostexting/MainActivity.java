@@ -92,14 +92,19 @@ public final class MainActivity extends Activity {
         button(advanced, "Diagnostics and privacy", this::showDiagnostics);
         text(root, "© Anthony Ferlazzo, 2026").setTextSize(12);
         ScrollView scroll = new ScrollView(this); scroll.setBackgroundColor(android.graphics.Color.WHITE);
-        // Insets belong to the viewport: content padding scrolls away and can put a button under Home.
-        scroll.setClipToPadding(true);
-        scroll.setOnApplyWindowInsetsListener((view, insets) -> {
+        // Give ScrollView an actual smaller viewport, rather than scrollable or clip padding.
+        // Its scroll-to-child calculations must use the area above Android navigation controls.
+        android.widget.FrameLayout viewport = new android.widget.FrameLayout(this);
+        viewport.setBackgroundColor(android.graphics.Color.WHITE);
+        viewport.setOnApplyWindowInsetsListener((view, insets) -> {
             view.setPadding(insets.getSystemWindowInsetLeft(), insets.getSystemWindowInsetTop(),
                 insets.getSystemWindowInsetRight(), insets.getSystemWindowInsetBottom());
             return insets;
         });
-        scroll.addView(root); setContentView(scroll);
+        scroll.addView(root);
+        viewport.addView(scroll, new android.widget.FrameLayout.LayoutParams(
+            android.view.ViewGroup.LayoutParams.MATCH_PARENT, android.view.ViewGroup.LayoutParams.MATCH_PARENT));
+        setContentView(viewport);
         getWindow().setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN
             | android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
         getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
