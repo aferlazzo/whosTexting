@@ -82,6 +82,7 @@ public final class MessagesListener extends NotificationListenerService {
             if (captureSender(this, row.label)) {
                 lastNumber = row.number;
                 SenderStore.record(this, row.label, row.number, sbn.getPostTime());
+                AutoIdentify.submit(this, row.number);
             }
         }
     }
