@@ -114,7 +114,13 @@ public final class MainActivity extends Activity {
     @Override protected void onPause() { handler.removeCallbacks(updater); super.onPause(); }
     @Override protected void onDestroy() { handler.removeCallbacks(updater); worker.shutdownNow(); super.onDestroy(); }
     @Override public void onRequestPermissionsResult(int code, String[] permissions, int[] results) {
-        super.onRequestPermissionsResult(code, permissions, results); updateContact(); refresh();
+        super.onRequestPermissionsResult(code, permissions, results);
+        if (code == 10 && AutoIdentify.enabled(this) && ContactActions.canRead(this)
+                && android.os.Build.VERSION.SDK_INT >= 33
+                && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
+                    != android.content.pm.PackageManager.PERMISSION_GRANTED)
+            requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 11);
+        updateContact(); refresh();
     }
     private void refresh() {
         if (monitor == null) return;
@@ -125,7 +131,10 @@ public final class MainActivity extends Activity {
             : "Monitoring paused.");
         accessButton.setVisibility(allowed ? View.GONE : View.VISIBLE);
         pauseButton.setText(MessagesListener.testing ? "Pause monitoring" : "Resume monitoring");
-        autoButton.setText(AutoIdentify.enabled(this) ? "Automatic identification: On" : "Automatic identification: Off");
+        autoButton.setText(!AutoIdentify.enabled(this) ? "Automatic identification: Off"
+            : !ContactActions.canRead(this) ? "Automatic identification: Needs Contacts permission"
+            : !getSystemService(NotificationManager.class).areNotificationsEnabled()
+                ? "Automatic identification: Alerts disabled" : "Automatic identification: On");
         List<SenderStore.Sender> recent = SenderStore.read(this);
         if (!busy && nameInput.getText().toString().trim().isEmpty() && proposal == null) {
             for (SenderStore.Sender candidate : recent) {
@@ -181,7 +190,9 @@ public final class MainActivity extends Activity {
             .setPositiveButton("Enable", (dialog, which) -> {
                 getSharedPreferences("sender_preferences", MODE_PRIVATE).edit()
                     .putBoolean("auto_lookup_consent", true).apply();
-                if (android.os.Build.VERSION.SDK_INT >= 33
+                if (!ContactActions.canRead(this)) {
+                    requestPermissions(new String[]{Manifest.permission.READ_CONTACTS}, 10);
+                } else if (android.os.Build.VERSION.SDK_INT >= 33
                     && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
                         != android.content.pm.PackageManager.PERMISSION_GRANTED) {
                     requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 11);

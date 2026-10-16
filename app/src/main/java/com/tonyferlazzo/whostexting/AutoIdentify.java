@@ -26,7 +26,13 @@ final class AutoIdentify {
             .getBoolean("auto_lookup_consent", false);
     }
 
+    interface Lookup { BusinessLookup.Result lookup(String number); }
+
     static void submit(Context context, String number) {
+        submit(context, number, BusinessLookup::lookup);
+    }
+
+    static void submit(Context context, String number, Lookup lookup) {
         if (!enabled(context) || !ContactActions.canRead(context) || number == null || number.isEmpty()
                 || number.replaceAll("[^0-9]", "").length() < 7
                 || MessagesListener.isIgnored(context, number)) return;
@@ -38,10 +44,9 @@ final class AutoIdentify {
         Context app = context.getApplicationContext();
         EXECUTOR.execute(() -> {
             try {
-                if (!enabled(app) || !ContactActions.canRead(app)
-                    || !ContactActions.existingName(app, key).isEmpty()) return;
-                BusinessLookup.Result result = BusinessLookup.lookup(key);
-                if (!enabled(app) || MessagesListener.isIgnored(app, key)) return;
+                if (!allowed(app, key)) return;
+                BusinessLookup.Result result = lookup.lookup(key);
+                if (!allowed(app, key)) return;
                 String title, detail;
                 if (result.matches.size() == 1) {
                     title = "Possible sender: " + result.matches.get(0).name;
@@ -49,6 +54,9 @@ final class AutoIdentify {
                 } else if (result.matches.size() > 1) {
                     title = "Several possible business matches";
                     detail = key + " · Conflicting public listings. Tap to review.";
+                } else if (!result.unavailable.isEmpty()) {
+                    title = "Sender identity unavailable";
+                    detail = key + " · Public directory lookup incomplete. Tap to review or retry.";
                 } else {
                     title = "Sender identity unknown";
                     detail = key + " · No reliable public-directory match found.";
@@ -63,7 +71,16 @@ final class AutoIdentify {
         });
     }
 
+    private static boolean allowed(Context context, String key) {
+        try {
+            return enabled(context) && ContactActions.canRead(context)
+                && !MessagesListener.isIgnored(context, key)
+                && ContactActions.existingName(context, key).isEmpty();
+        } catch (RuntimeException unavailable) { return false; }
+    }
+
     private static void show(Context context, String number, String title, String detail) {
+        if (!allowed(context, number)) return;
         NotificationManager manager = context.getSystemService(NotificationManager.class);
         if (manager == null) return;
         if (Build.VERSION.SDK_INT >= 33 &&

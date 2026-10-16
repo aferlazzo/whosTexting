@@ -4,10 +4,13 @@ on:
     branches: [main]
   workflow_dispatch:
 jobs:
+  delivery-tests:
+    uses: ./.github/workflows/notification-integration.yml
   compile:
+    needs: delivery-tests
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -39,3 +42,9 @@ jobs:
         with:
           name: WhosTexting-permanent-signed-release
           path: app/build/outputs/apk/release/app-release.apk
+      - name: Publish verified signed APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp app/build/outputs/apk/release/app-release.apk whostexting-1.0.3.apk
+          gh release create v1.0.3 whostexting-1.0.3.apk certificate-verification.txt --target "$GITHUB_SHA" --title "Who's Texting? 1.0.3" --notes "Automatic sender identification fixes. API 35 and 36 emulator tests passed before publication. Uses the existing permanent signing certificate. Physical Pixel delivery is not verified by these emulator tests."

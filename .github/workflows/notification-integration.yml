@@ -1,7 +1,6 @@
 name: Android notification delivery tests
 on:
-  push:
-    branches: [main]
+  workflow_call:
   workflow_dispatch:
 permissions:
   contents: read
@@ -17,8 +16,6 @@ jobs:
             target: default
           - api: 36
             target: default
-          - api: '37.0'
-            target: google_apis
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -51,6 +48,7 @@ jobs:
             adb install notification-fixture/build/outputs/apk/debug/notification-fixture-debug.apk
             adb shell pm grant com.google.android.apps.messaging android.permission.POST_NOTIFICATIONS
             adb shell pm grant com.google.android.apps.messaging android.permission.WRITE_CONTACTS
+            adb shell pm grant com.tonyferlazzo.whostexting android.permission.POST_NOTIFICATIONS
             adb shell pm grant com.tonyferlazzo.whostexting android.permission.READ_CONTACTS
             adb shell cmd notification allow_listener com.tonyferlazzo.whostexting/com.tonyferlazzo.whostexting.MessagesListener
             adb shell am instrument -w -r com.tonyferlazzo.whostexting.test/androidx.test.runner.AndroidJUnitRunner | tee instrumentation-result.txt

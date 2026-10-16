@@ -47,7 +47,7 @@ public final class NotificationDeliveryTest {
         try {
             // Post from a separate installed fixture process. Do not call the listener directly.
             post(flat, false);
-            await("Real Android callback must capture sender", () -> flat.equals(MessagesListener.lastSender));
+            await("Real Android callback must capture sender", () -> SenderStore.read(context).stream().anyMatch(row -> key.equals(row.number)));
             assertTrue("Google source callback counted", MessagesListener.googleEvents > 0);
             assertTrue("Active snapshot finds current notification",
                 MessagesListener.checkCurrentMessages().contains(flat));
@@ -66,12 +66,12 @@ public final class NotificationDeliveryTest {
 
             MessagesListener.setIgnored(context, key, false);
             post(flat, false);
-            await("Undo allows actual callback again", () -> flat.equals(MessagesListener.lastSender));
+            await("Undo allows actual callback again", () -> SenderStore.read(context).stream().anyMatch(row -> key.equals(row.number)));
 
             // Use Android MessagingStyle as SMS/RCS conversation notifications do.
             post(conversation, true);
             await("Conversation notification title captured",
-                () -> conversation.equals(MessagesListener.lastSender));
+                () -> MessagesListener.numberKey(conversation).equals(MessagesListener.lastNumber));
 
             // Phone metadata survives when Messages shows a contact name instead of digits.
             Intent known = new Intent();

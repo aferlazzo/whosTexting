@@ -17,8 +17,11 @@ final class ContactActions {
         Uri uri = Uri.withAppendedPath(ContactsContract.PhoneLookup.CONTENT_FILTER_URI, Uri.encode(number));
         try (Cursor cursor = context.getContentResolver().query(uri,
                 new String[]{ContactsContract.PhoneLookup.DISPLAY_NAME}, null, null, null)) {
-            String name = cursor != null && cursor.moveToFirst() ? cursor.getString(0) : "";
-            return name == null ? "" : name;
+            if (cursor == null) throw new IllegalStateException("Contacts query unavailable");
+            if (!cursor.moveToFirst()) return "";
+            String name = cursor.getString(0);
+            // A saved phone-only contact is still a known contact.
+            return name == null || name.trim().isEmpty() ? "Saved contact" : name;
         }
     }
     static Intent draft(String number, String approvedName) {
