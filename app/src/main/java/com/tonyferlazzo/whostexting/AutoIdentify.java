@@ -14,7 +14,7 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-/** Optional, consented lookup of new unknown numbers. Never reads message bodies. */
+/** Optional, consented lookup of new unknown numbers. Message clues are derived locally; only numbers reach directories. */
 final class AutoIdentify {
     private static final String CHANNEL = "sender_identity";
     private static final ExecutorService EXECUTOR = Executors.newSingleThreadExecutor();
@@ -27,6 +27,24 @@ final class AutoIdentify {
     }
 
     interface Lookup { BusinessLookup.Result lookup(String number); }
+
+    static void submitWithClues(Context context, String number, String clues) {
+        if (clues != null && !clues.isEmpty()) {
+            if (ContactActions.canRead(context) && !MessagesListener.isIgnored(context, number)) {
+                try {
+                    if (ContactActions.existingName(context, number).isEmpty())
+                        showClues(context, number, clues);
+                } catch (RuntimeException unavailable) { /* Fail closed on contact access failure. */ }
+            }
+            return; // Useful local clues avoid unnecessary external lookup.
+        }
+        submit(context, number);
+    }
+
+    private static void showClues(Context context, String number, String clues) {
+        // Local analysis does not require consent to external directory lookup.
+        show(context, number, "Text purpose (unverified)", number + " · " + clues, false);
+    }
 
     static void submit(Context context, String number) {
         submit(context, number, BusinessLookup::lookup);
@@ -80,7 +98,14 @@ final class AutoIdentify {
     }
 
     private static void show(Context context, String number, String title, String detail) {
-        if (!allowed(context, number)) return;
+        show(context, number, title, detail, true);
+    }
+
+    private static void show(Context context, String number, String title, String detail, boolean external) {
+        if (external && !allowed(context, number)) return;
+        if (!ContactActions.canRead(context) || MessagesListener.isIgnored(context, number)) return;
+        try { if (!ContactActions.existingName(context, number).isEmpty()) return; }
+        catch (RuntimeException unavailable) { return; }
         NotificationManager manager = context.getSystemService(NotificationManager.class);
         if (manager == null) return;
         if (Build.VERSION.SDK_INT >= 33 &&

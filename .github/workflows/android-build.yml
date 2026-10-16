@@ -49,5 +49,5 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cp app/build/outputs/apk/release/app-release.apk whostexting-1.0.3.apk
-          gh release create v1.0.3 whostexting-1.0.3.apk certificate-verification.txt --target "$GITHUB_SHA" --title "Who's Texting? 1.0.3" --notes "Automatic sender identification fixes. API 35 and 36 emulator tests passed before publication. Uses the existing permanent signing certificate. Physical Pixel delivery is not verified by these emulator tests."
+          cp app/build/outputs/apk/release/app-release.apk whostexting-1.0.4.apk
+          gh release create v1.0.4 whostexting-1.0.4.apk certificate-verification.txt --target "$GITHUB_SHA" --title "Who's Texting? 1.0.4" --notes "Local message-first sender and purpose clues; directory fallback. API 35 and 36 emulator tests passed before publication. Uses the existing permanent signing certificate. Physical Pixel delivery is not verified by these emulator tests."

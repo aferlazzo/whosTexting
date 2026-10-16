@@ -9,9 +9,13 @@ import java.util.List;
 final class SenderStore {
     static final int LIMIT = 30;
     static final class Sender {
-        final String id, label, number;
+        final String id, label, number, clues;
         final long time;
         Sender(String label, String number, long time) {
+            this(label, number, time, "");
+        }
+        Sender(String label, String number, long time, String clues) {
+            this.clues = clues;
             this.label = label;
             this.number = number;
             this.id = number.isEmpty() ? "label:" + label : number;
@@ -25,7 +29,7 @@ final class SenderStore {
                 .getString("recent", "[]"));
             for (int i = 0; i < data.length() && result.size() < LIMIT; i++) {
                 JSONObject row = data.getJSONObject(i);
-                result.add(new Sender(row.getString("label"), row.getString("number"), row.getLong("time")));
+                result.add(new Sender(row.getString("label"), row.getString("number"), row.getLong("time"), row.optString("clues", "")));
             }
         } catch (Exception ignored) { /* Corrupt local history is not an identity source. */ }
         return result;
@@ -34,8 +38,11 @@ final class SenderStore {
         record(context, label, number, System.currentTimeMillis());
     }
     static synchronized void record(Context context, String label, String number, long timestamp) {
+        record(context, label, number, timestamp, "");
+    }
+    static synchronized void record(Context context, String label, String number, long timestamp, String clues) {
         List<Sender> history = read(context);
-        Sender latest = new Sender(label, number, timestamp);
+        Sender latest = new Sender(label, number, timestamp, clues);
         for (Sender row : history) if (row.id.equals(latest.id) && row.time > timestamp) return;
         history.removeIf(row -> row.id.equals(latest.id));
         history.add(0, latest);
@@ -44,7 +51,7 @@ final class SenderStore {
         for (int i = 0; i < history.size() && i < LIMIT; i++) {
             Sender row = history.get(i);
             JSONObject json = new JSONObject();
-            try { json.put("label", row.label).put("number", row.number).put("time", row.time); }
+            try { json.put("label", row.label).put("number", row.number).put("time", row.time).put("clues", row.clues); }
             catch (Exception impossible) { continue; }
             data.put(json);
         }

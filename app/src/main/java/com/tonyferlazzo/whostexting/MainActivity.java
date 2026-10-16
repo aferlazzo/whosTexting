@@ -150,7 +150,7 @@ public final class MainActivity extends Activity {
         selected = sender; proposal = null; nameInput.setText("");
         senderText.setText(sender.label + (sender.number.isEmpty() || sender.label.equals(sender.number)
             ? "" : "\n" + sender.number));
-        lookupText.setText(sender.number.isEmpty()
+        lookupText.setText(!sender.clues.isEmpty() ? sender.clues : sender.number.isEmpty()
             ? "Google Messages did not supply a phone number for this sender. Business lookup requires a number."
             : "No business identity checked yet. Lookup results are proposals, not verified senders.");
         updateContact(); updateButtons();
@@ -202,7 +202,7 @@ public final class MainActivity extends Activity {
     }
     private void enableAccess() {
         new AlertDialog.Builder(this).setTitle("Allow sender detection")
-            .setMessage("Android grants broad notification access. Who's Texting? only inspects Google Messages sender labels and phone metadata; it never reads message bodies.\n\nIf Android shows Controlled by Restricted Setting, open this app's App info from its home-screen icon, then ⋮ → Allow restricted settings. This differs from the app's Notifications setting for sending notifications.")
+            .setMessage("Android grants broad notification access. Who's Texting? analyzes available Google Messages notification text locally for unfamiliar senders to infer purpose and mentioned names. Raw message text is not stored or transmitted. Derived, unverified clues are kept with recent senders.\n\nIf Android shows Controlled by Restricted Setting, open this app's App info from its home-screen icon, then ⋮ → Allow restricted settings. This differs from the app's Notifications setting for sending notifications.")
             .setNegativeButton("Cancel", null).setPositiveButton("Open permission screen", (dialog, which) ->
                 startActivity(new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))).show();
     }
@@ -301,7 +301,7 @@ public final class MainActivity extends Activity {
                 + "\nMonitoring: " + (MessagesListener.testing ? "Running" : "Paused")
                 + "\nGoogle Messages callbacks: " + MessagesListener.googleEvents
                 + "\nDiagnostic: " + MessagesListener.diagnostic
-                + "\n\nOnly the latest 30 unique sender labels/numbers are kept privately on this phone. Message bodies are not read or stored. No default SMS role or contacts write permission is requested. External lookups happen only after you approve sending the selected number.\n\nDirectory data: Wikidata (CC0) and © OpenStreetMap contributors (ODbL). Public listings may be outdated or shared; no listing authenticates a message sender.")
+                + "\n\nOnly the latest 30 unique sender labels/numbers are kept privately on this phone. Available notification text is analyzed locally. Raw message bodies are not stored or transmitted; derived purpose and sender clues are retained with history. No default SMS role or contacts write permission is requested. External lookups happen only after you approve sending the selected number.\n\nDirectory data: Wikidata (CC0) and © OpenStreetMap contributors (ODbL). Public listings may be outdated or shared; no listing authenticates a message sender.")
             .setPositiveButton("Close", null)
             .setNeutralButton("Check current notifications", (dialog, which) -> {
                 lookupText.setText(MessagesListener.checkCurrentMessages()); refresh();

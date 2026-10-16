@@ -81,8 +81,9 @@ public final class MessagesListener extends NotificationListenerService {
             if (isIgnored(this, row.number)) { diagnostic = "Ignored sender skipped"; continue; }
             if (captureSender(this, row.label)) {
                 lastNumber = row.number;
-                SenderStore.record(this, row.label, row.number, sbn.getPostTime());
-                AutoIdentify.submit(this, row.number);
+                String clues = messageClues(this, sbn.getNotification(), row.number);
+                SenderStore.record(this, row.label, row.number, sbn.getPostTime(), clues);
+                AutoIdentify.submitWithClues(this, row.number, clues);
             }
         }
     }
@@ -105,7 +106,7 @@ public final class MessagesListener extends NotificationListenerService {
         CharSequence title = extras.getCharSequence(Notification.EXTRA_TITLE);
         if (title == null) { diagnostic = "Sender title missing"; return null; }
         String sender = title.toString().trim();
-        // Only inspect sender labels. Never inspect, retain or transmit message bodies.
+        // Sender extraction stays separate from local message analysis.
         if (sender.isEmpty() || sender.length() > 160) {
             diagnostic = "Sender title filtered"; return null;
         }
@@ -193,6 +194,38 @@ public final class MessagesListener extends NotificationListenerService {
         return senders;
     }
 
+    static String messageClues(Context context, Notification notification, String number) {
+        if (number.isEmpty() || !ContactActions.canRead(context) || isIgnored(context, number)) return "";
+        try { if (!ContactActions.existingName(context, number).isEmpty()) return ""; }
+        catch (RuntimeException unavailable) { return ""; }
+        if (notification == null || notification.extras == null) return "";
+        Bundle extras = notification.extras;
+        android.os.Parcelable[] messages = extras.getParcelableArray("android.messages");
+        if (messages != null && messages.length > 0) {
+            // Match each body to its own explicit sender, including grouped conversations.
+            for (int i = messages.length - 1; i >= 0; i--) {
+                if (!(messages[i] instanceof Bundle)) continue;
+                Bundle message = (Bundle) messages[i];
+                String sender = numberKey(String.valueOf(message.getCharSequence("sender", "")));
+                android.os.Parcelable value = message.getParcelable("sender_person");
+                if (value instanceof android.app.Person) {
+                    String uri = numberKey(((android.app.Person) value).getUri());
+                    if (!uri.isEmpty()) sender = uri;
+                }
+                if (number.equals(sender)) {
+                    CharSequence text = message.getCharSequence("text");
+                    return MessageClues.analyze(text == null ? null : text.toString());
+                }
+            }
+            return ""; // Never attribute another participant's text to this number.
+        }
+        if ((notification.flags & Notification.FLAG_GROUP_SUMMARY) != 0) return "";
+        if (!number.equals(senderNumber(notification, senderTitle(notification)))) return "";
+        CharSequence text = extras.getCharSequence(Notification.EXTRA_BIG_TEXT);
+        if (text == null) text = extras.getCharSequence(Notification.EXTRA_TEXT);
+        return MessageClues.analyze(text == null ? null : text.toString());
+    }
+
     static String checkCurrentMessages() {
         MessagesListener listener = activeListener;
         if (listener == null || !connected)
@@ -213,7 +246,9 @@ public final class MessagesListener extends NotificationListenerService {
                     // A snapshot is separate from live event counters.
                     lastSender = row.label;
                     lastNumber = row.number;
-                    SenderStore.record(listener, row.label, row.number, notification.getPostTime());
+                    String clues = messageClues(listener, notification.getNotification(), row.number);
+                    SenderStore.record(listener, row.label, row.number, notification.getPostTime(), clues);
+                    AutoIdentify.submitWithClues(listener, row.number, clues);
                     recovered.add(row.id);
                 }
             }

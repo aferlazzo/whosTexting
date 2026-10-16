@@ -2,7 +2,14 @@
 
 Android component for reviewing Google Messages notification senders. No SMS-app replacement.
 
-## Version 1.0.3
+## Version 1.0.4
+- Message-first identification analyzes available notification text locally for unknown numbers (including short codes).
+- Conservative rules extract apparent purpose and mentioned organizations, clearly marked as unverified message clues. No remote AI or API key is used.
+- Useful clues appear in sender review and an identification notification. Directory lookup is the fallback when automatic external lookup is enabled and no useful clues exist.
+- Raw text is neither stored nor transmitted. Derived clues remain in the existing erasable 30-sender history.
+- Contacts permission is required; saved contacts and ambiguous message-to-sender associations are skipped.
+
+## Previous version 1.0.3
 - Explicit opt-in enables automatic business-directory lookup for newly detected unknown numbers.
 - Automatic lookup pauses without Contacts permission and skips saved contacts, including contacts without a display name. Failed contact queries stop the lookup.
 - Android notification permission is requested after Contacts permission. The main screen shows missing Contacts permission or disabled alerts.
@@ -27,7 +34,7 @@ The app does not read historical SMS/RCS texts, recover dismissed notifications,
 Wikidata and OpenStreetMap are community directories. Their public data can be incomplete, stale, or conflicting; lookup is an attempt, not a universal reverse-phone service. No paid API or embedded secret is used.
 
 ## Privacy
-Message bodies are never intentionally inspected or stored. No message text, contact list, or device location is transmitted. INTERNET is used only for consented directory lookups; Contacts access is read-only and optional. Sender history and ignore rules remain in private device settings; backup is disabled. Android notification-listener access is broad even though the application filters to Google Messages. No default SMS role is requested.
+Available message notification bodies are inspected locally to derive unverified sender/purpose clues; raw bodies are never stored. No message text, contact list, or device location is transmitted. INTERNET is used only for consented directory lookups; Contacts access is read-only and optional. Sender history and ignore rules remain in private device settings; backup is disabled. Android notification-listener access is broad even though the application filters to Google Messages. No default SMS role is requested.
 
 Data attribution: Wikidata (CC0); © OpenStreetMap contributors (ODbL). Source links remain visible beside proposals.
 
