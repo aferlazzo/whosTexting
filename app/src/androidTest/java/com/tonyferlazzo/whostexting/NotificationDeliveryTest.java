@@ -65,8 +65,10 @@ public final class NotificationDeliveryTest {
                 MessagesListener.checkCurrentMessages().startsWith("Recovered "));
 
             MessagesListener.setIgnored(context, key, false);
+            int beforeUndo = MessagesListener.count;
             post(flat, false);
-            await("Undo allows actual callback again", () -> SenderStore.read(context).stream().anyMatch(row -> key.equals(row.number)));
+            await("Undo allows actual callback again", () -> MessagesListener.count > beforeUndo
+                && key.equals(MessagesListener.lastNumber));
 
             // Use Android MessagingStyle as SMS/RCS conversation notifications do.
             post(conversation, true);

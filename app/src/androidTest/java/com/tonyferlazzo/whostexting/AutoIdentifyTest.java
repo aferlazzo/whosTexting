@@ -65,4 +65,26 @@ public final class AutoIdentifyTest {
                 n.getId() == unknown.hashCode() && n.getNotification().contentIntent != null));
         } finally { consent(false); manager.cancelAll(); MessagesListener.setIgnored(context, unknown, false); }
     }
+    @Test public void identityAlertsDistinguishMatchesConflictsAndNoMatch() {
+        NotificationManager manager = context.getSystemService(NotificationManager.class);
+        manager.cancelAll(); consent(true);
+        try {
+            for (int outcome = 0; outcome < 3; outcome++) {
+                String number = "+1202555013" + outcome;
+                final int size = outcome;
+                AutoIdentify.submit(context, number, key -> {
+                    BusinessLookup.Result result = new BusinessLookup.Result();
+                    for (int index = 0; index < size; index++) result.matches.add(new BusinessLookup.Match(
+                        "Synthetic Business " + index, "https://www.wikidata.org/wiki/Q123", "", "Wikidata"));
+                    return result;
+                });
+                String expected = outcome == 0 ? "Sender identity unknown"
+                    : outcome == 1 ? "Possible sender: Synthetic Business 0" : "Several possible business matches";
+                waitFor(() -> java.util.Arrays.stream(manager.getActiveNotifications()).anyMatch(n ->
+                    n.getId() == number.hashCode() && expected.contentEquals(
+                        n.getNotification().extras.getCharSequence(android.app.Notification.EXTRA_TITLE))));
+            }
+        } finally { consent(false); manager.cancelAll(); }
+    }
+
 }

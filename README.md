@@ -2,7 +2,14 @@
 
 Android component for reviewing Google Messages notification senders. No SMS-app replacement.
 
-## Version 1.0.0
+## Version 1.0.3
+- Explicit opt-in enables automatic business-directory lookup for newly detected unknown numbers.
+- Automatic lookup pauses without Contacts permission and skips saved contacts, including contacts without a display name. Failed contact queries stop the lookup.
+- Android notification permission is requested after Contacts permission. The main screen shows missing Contacts permission or disabled alerts.
+- Identification notifications label proposals as unverified, distinguish incomplete directory lookups from no matches, and open the captured sender for review.
+- Release publication requires passing API 35 and 36 emulator tests and verification of the existing permanent signing certificate.
+
+## Existing features
 - Monitoring starts automatically once notification access is granted, and its running/paused choice is retained locally.
 - Captured sender labels and available phone metadata appear on the main review screen.
 - Last 30 unique captured senders are kept locally, with Recent senders and explicit history erasure.
