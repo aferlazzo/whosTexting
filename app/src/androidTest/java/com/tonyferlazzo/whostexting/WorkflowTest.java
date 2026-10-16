@@ -76,6 +76,29 @@ public final class WorkflowTest {
         } finally { SenderStore.clear(context); }
     }
 
+    @Test public void sampleButtonRunsRealAnalysisWithoutChangingHistoryOrConsent() {
+        String before = context.getSharedPreferences("captured_senders", 0).getString("recent", "[]");
+        boolean consent = AutoIdentify.enabled(context);
+        boolean monitoring = MessagesListener.testing;
+        MessagesListener.setTesting(context, false);
+        try (ActivityScenario<MainActivity> activity = ActivityScenario.launch(MainActivity.class)) {
+            onView(withText("Test sample message")).check(matches(isDisplayed())).perform(click());
+            onView(withText("Sample test passed")).check(matches(isDisplayed()));
+            onView(withText(org.hamcrest.Matchers.containsString("4/4 checks passed"))).check(matches(isDisplayed()));
+            onView(withText(org.hamcrest.Matchers.containsString("Mentioned sender: Walgreens"))).check(matches(isDisplayed()));
+            captureScreen("sample-test-result.png");
+            onView(withText("Done")).perform(click());
+            assertEquals(before, context.getSharedPreferences("captured_senders", 0).getString("recent", "[]"));
+            assertEquals(consent, AutoIdentify.enabled(context));
+            assertFalse(MessagesListener.testing);
+            // Running it twice must not accumulate sample senders or change monitoring.
+            onView(withText("Test sample message")).perform(click());
+            onView(withText("Sample test passed")).check(matches(isDisplayed()));
+            onView(withText("Done")).perform(click());
+            assertEquals(before, context.getSharedPreferences("captured_senders", 0).getString("recent", "[]"));
+        } finally { MessagesListener.setTesting(context, monitoring); }
+    }
+
     private void captureScreen(String name) {
         android.graphics.Bitmap image = InstrumentationRegistry.getInstrumentation().getUiAutomation().takeScreenshot();
         assertNotNull("UI screenshot must be available", image);

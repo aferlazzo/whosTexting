@@ -51,6 +51,7 @@ public final class MainActivity extends Activity {
         catch (Exception ignored) { }
         TextView heading = text(root, "Who's Texting? " + version); heading.setTextSize(24);
         monitor = text(root, "Checking notification access…");
+        button(root, "Test sample message", this::testSampleMessage);
         accessButton = button(root, "Enable notification access", this::enableAccess);
         senderText = text(root, "No sender captured yet."); senderText.setTextSize(22);
         identityText = text(root, "");
@@ -294,6 +295,27 @@ public final class MainActivity extends Activity {
         try { startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url))); }
         catch (RuntimeException error) { lookupText.setText("No browser is available to open the evidence."); }
     }
+    private void testSampleMessage() {
+        String sample = "Your Walgreens prescription is ready for pickup.";
+        String result = MessageClues.analyze(sample);
+        boolean pharmacy = result.contains("Walgreens") && result.contains("Prescription")
+            && result.contains("not verified");
+        String delivery = MessageClues.analyze("Your FedEx package arrives today.");
+        boolean shipment = delivery.contains("FedEx") && delivery.contains("Delivery")
+            && delivery.contains("not verified");
+        boolean unknown = MessageClues.analyze("See you tomorrow.").isEmpty();
+        String code = MessageClues.analyze("Your verification code is 123456.");
+        boolean privateCode = code.contains("Verification") && !code.contains("123456");
+        int passed = (pharmacy ? 1 : 0) + (shipment ? 1 : 0) + (unknown ? 1 : 0) + (privateCode ? 1 : 0);
+        new AlertDialog.Builder(this)
+            .setTitle(passed == 4 ? "Sample test passed" : "Sample test needs attention")
+            .setMessage("DEMO — fictional text, not a received message.\n\nSample:\n" + sample
+                + "\n\nWT result:\n" + (result.isEmpty() ? "No useful clue found." : result)
+                + "\n\n" + passed + "/4 checks passed: pharmacy, delivery, unknown text, and keeping verification codes out of results."
+                + "\n\nThis tests local message analysis. It does not test delivery from Google Messages. No internet lookup, contact changes, or saved sample history.")
+            .setPositiveButton("Done", null).show();
+    }
+
     private void showDiagnostics() {
         new AlertDialog.Builder(this).setTitle("Diagnostics and privacy")
             .setMessage("Notification access: " + (hasAccess() ? "Allowed" : "Not allowed")

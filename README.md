@@ -2,7 +2,13 @@
 
 Android component for reviewing Google Messages notification senders. No SMS-app replacement.
 
-## Version 1.0.4
+## Version 1.0.5
+- A visible Test sample message button runs the real local analyzer immediately, without waiting for a text or typing.
+- A labeled fictional sample shows the extracted result and four pass/fail checks. It does not change history, Contacts, external-lookup consent, or monitoring.
+- The result explicitly distinguishes local analysis from Google Messages notification delivery.
+- The actual button and dialog are exercised on API 35 and 36 before release.
+
+## Previous version 1.0.4
 - Message-first identification analyzes available notification text locally for unknown numbers (including short codes).
 - Conservative rules extract apparent purpose and mentioned organizations, clearly marked as unverified message clues. No remote AI or API key is used.
 - Useful clues appear in sender review and an identification notification. Directory lookup is the fallback when automatic external lookup is enabled and no useful clues exist.
