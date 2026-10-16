@@ -67,7 +67,10 @@ public final class WorkflowTest {
         try (ActivityScenario<MainActivity> activity = ActivityScenario.launch(MainActivity.class)) {
             captureScreen("review-screen.png");
             onView(withContentDescription("Name you approve for this number")).perform(scrollTo(), replaceText("Approved sample"), closeSoftKeyboard());
-            onView(withText("Review and save contact")).perform(scrollTo(), click());
+            onView(withText("Review and save contact")).perform(scrollTo());
+            captureScreen("before-contact-review-click.png");
+            onView(withText("Review and save contact")).perform(click());
+            captureScreen("after-contact-review-click.png");
             onView(withText("Approve this contact draft?")).check(matches(isDisplayed()));
             captureScreen("approval-screen.png");
             onView(withText("Cancel")).perform(click());

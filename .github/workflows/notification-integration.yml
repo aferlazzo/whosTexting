@@ -52,8 +52,9 @@ jobs:
             adb shell pm grant com.tonyferlazzo.whostexting android.permission.READ_CONTACTS
             adb shell cmd notification allow_listener com.tonyferlazzo.whostexting/com.tonyferlazzo.whostexting.MessagesListener
             adb shell am instrument -w -r com.tonyferlazzo.whostexting.test/androidx.test.runner.AndroidJUnitRunner | tee instrumentation-result.txt
+            adb logcat -d > android-logcat.txt
+            adb pull /sdcard/Android/data/com.tonyferlazzo.whostexting/files/qa ui-evidence || true
             grep -E "OK \\([0-9]+ tests?\\)" instrumentation-result.txt
-            adb pull /sdcard/Android/data/com.tonyferlazzo.whostexting/files/qa ui-evidence
       - name: Retain test evidence only
         if: always()
         uses: actions/upload-artifact@v4
@@ -61,4 +62,5 @@ jobs:
           name: notification-delivery-results-api-${{ matrix.api }}
           path: |
             instrumentation-result.txt
+            android-logcat.txt
             ui-evidence/*.png
