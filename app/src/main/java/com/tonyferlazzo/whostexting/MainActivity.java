@@ -46,10 +46,6 @@ public final class MainActivity extends Activity {
         LinearLayout root = new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL);
         int padding = (int)(16 * getResources().getDisplayMetrics().density);
         root.setPadding(padding, padding, padding, padding);
-        root.setOnApplyWindowInsetsListener((view, insets) -> {
-            view.setPadding(padding, padding + insets.getSystemWindowInsetTop(), padding,
-                padding + insets.getSystemWindowInsetBottom()); return insets;
-        });
         String version = "1.0.0";
         try { version = getPackageManager().getPackageInfo(getPackageName(), 0).versionName; }
         catch (Exception ignored) { }
@@ -96,7 +92,16 @@ public final class MainActivity extends Activity {
         button(advanced, "Diagnostics and privacy", this::showDiagnostics);
         text(root, "© Anthony Ferlazzo, 2026").setTextSize(12);
         ScrollView scroll = new ScrollView(this); scroll.setBackgroundColor(android.graphics.Color.WHITE);
+        // Insets belong to the viewport: content padding scrolls away and can put a button under Home.
+        scroll.setClipToPadding(true);
+        scroll.setOnApplyWindowInsetsListener((view, insets) -> {
+            view.setPadding(insets.getSystemWindowInsetLeft(), insets.getSystemWindowInsetTop(),
+                insets.getSystemWindowInsetRight(), insets.getSystemWindowInsetBottom());
+            return insets;
+        });
         scroll.addView(root); setContentView(scroll);
+        getWindow().setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN
+            | android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
         getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
         if (android.os.Build.VERSION.SDK_INT >= 30 && getWindow().getInsetsController() != null) {
             getWindow().getInsetsController().setSystemBarsAppearance(

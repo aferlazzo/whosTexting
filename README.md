@@ -6,6 +6,7 @@ Android component for reviewing Google Messages notification senders. No SMS-app
 - Test unknown sender uses the same sender parser and processing path as live notifications, with fictional input, simulated unknown Contacts, isolated history and no external lookup.
 - The test submits a clearly labeled WT TEST alert through the same Android notification builder/post code used by live alerts. Missing permission or blocked test channels are reported, not treated as successful alert delivery.
 - Test results persist separately from real sender history. No test edits Contacts, replaces Google Messages, sends an SMS, or changes monitoring.
+- System bar insets now protect the scrolling viewport, so lower controls cannot scroll underneath Android navigation buttons. The keyboard opens only when requested.
 - Main screen separates monitoring, identification permissions, latest real capture, and the last simulated test. Contacts and alert setup actions appear only when needed.
 - Current-notification check and Recent senders are prominent. Optional directory lookup, pause, ignored numbers, and diagnostics sit under Settings and privacy.
 - Known-contact and missing/failed Contacts queries cannot proceed to body analysis or automatic lookup. Rechecking an unchanged notification does not repeatedly alert.
