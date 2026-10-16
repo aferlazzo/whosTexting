@@ -58,7 +58,7 @@ public final class MainActivity extends Activity {
             if (!ContactActions.canRead(this)) requestPermissions(new String[]{Manifest.permission.READ_CONTACTS}, 10);
             else updateContact();
         });
-        autoButton = button(root, "Automatic identification: Off", this::toggleAutomatic);
+        autoButton = button(root, "Directory fallback: Off", this::toggleAutomatic);
         lookupButton = button(root, "Look up business", this::askLookup);
         lookupText = text(root, "Business lookup is optional. No contact is saved automatically.");
         sourceButton = button(root, "View directory evidence", () -> openWeb(proposal == null ? "" : proposal.evidence));
@@ -131,10 +131,10 @@ public final class MainActivity extends Activity {
             : "Monitoring paused.");
         accessButton.setVisibility(allowed ? View.GONE : View.VISIBLE);
         pauseButton.setText(MessagesListener.testing ? "Pause monitoring" : "Resume monitoring");
-        autoButton.setText(!AutoIdentify.enabled(this) ? "Automatic identification: Off"
-            : !ContactActions.canRead(this) ? "Automatic identification: Needs Contacts permission"
+        autoButton.setText(!AutoIdentify.enabled(this) ? "Directory fallback: Off"
+            : !ContactActions.canRead(this) ? "Directory fallback: Needs Contacts permission"
             : !getSystemService(NotificationManager.class).areNotificationsEnabled()
-                ? "Automatic identification: Alerts disabled" : "Automatic identification: On");
+                ? "Directory fallback: Alerts disabled" : "Directory fallback: On");
         List<SenderStore.Sender> recent = SenderStore.read(this);
         if (!busy && nameInput.getText().toString().trim().isEmpty() && proposal == null) {
             for (SenderStore.Sender candidate : recent) {
@@ -184,7 +184,7 @@ public final class MainActivity extends Activity {
             refresh();
             return;
         }
-        new AlertDialog.Builder(this).setTitle("Enable automatic sender identification?")
+        new AlertDialog.Builder(this).setTitle("Enable automatic directory fallback?")
             .setMessage("For each new unfamiliar sender with a usable phone number, Who's Texting? may send only that number to Wikidata and OpenStreetMap to search public business listings. Message contents and your contact list are never sent. Listings are unverified and may be missing or incorrect. You can turn this off here at any time.")
             .setNegativeButton("Cancel", null)
             .setPositiveButton("Enable", (dialog, which) -> {

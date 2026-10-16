@@ -46,7 +46,7 @@ public final class MessageCluesTest {
         grouped.extras.putParcelableArray("android.messages", new Bundle[]{message});
         assertTrue(MessagesListener.messageClues(context, grouped, number).contains("FedEx"));
         assertEquals("", MessagesListener.messageClues(context, grouped, "+12025550177"));
-        SenderStore.record(context, number, number, 123L, "Apparent purpose: Delivery");
+        SenderStore.record(context, number, number, System.currentTimeMillis(), "Apparent purpose: Delivery");
         assertTrue(SenderStore.read(context).stream().anyMatch(row -> row.number.equals(number)
             && row.clues.equals("Apparent purpose: Delivery")));
         SenderStore.clear(context);

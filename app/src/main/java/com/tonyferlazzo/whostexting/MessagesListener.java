@@ -208,7 +208,7 @@ public final class MessagesListener extends NotificationListenerService {
                 Bundle message = (Bundle) messages[i];
                 String sender = numberKey(String.valueOf(message.getCharSequence("sender", "")));
                 android.os.Parcelable value = message.getParcelable("sender_person");
-                if (value instanceof android.app.Person) {
+                if (android.os.Build.VERSION.SDK_INT >= 28 && value instanceof android.app.Person) {
                     String uri = numberKey(((android.app.Person) value).getUri());
                     if (!uri.isEmpty()) sender = uri;
                 }
