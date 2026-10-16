@@ -27,7 +27,7 @@ final class AutoIdentify {
     }
 
     static void submit(Context context, String number) {
-        if (!enabled(context) || number == null || number.isEmpty()
+        if (!enabled(context) || !ContactActions.canRead(context) || number == null || number.isEmpty()
                 || number.replaceAll("[^0-9]", "").length() < 7
                 || MessagesListener.isIgnored(context, number)) return;
         String key = MessagesListener.numberKey(number);
@@ -38,7 +38,8 @@ final class AutoIdentify {
         Context app = context.getApplicationContext();
         EXECUTOR.execute(() -> {
             try {
-                if (!enabled(app) || !ContactActions.existingName(app, key).isEmpty()) return;
+                if (!enabled(app) || !ContactActions.canRead(app)
+                    || !ContactActions.existingName(app, key).isEmpty()) return;
                 BusinessLookup.Result result = BusinessLookup.lookup(key);
                 if (!enabled(app) || MessagesListener.isIgnored(app, key)) return;
                 String title, detail;
